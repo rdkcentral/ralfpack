@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.bskyb.com/ns/widgets" version="2.0">
+    <name short="com.flying.monkeys" version="2.14.1.2100">Flying Monkeys App</name>
+    <icon src="icon.png" type="image/png"/>
+    <content src="." type="application/html"/>
+    <capabilities>
+        <capability name="wan-lan"/>
+        <capability name="storage"/>
+        <capability name="usb-mass-storage"/>
+        <capability name="local-services-4"/>
+        <capability name="firebolt"/>
+    </capabilities>
+</widget>

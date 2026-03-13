@@ -1,0 +1,209 @@
+#
+# If not stated otherwise in this file or this component's LICENSE file the
+# following copyright and licenses apply:
+#
+# Copyright 2025 Comcast Cable Communications Management, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+name: Build For Linux
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.cfg_release_channel }} for ${{ matrix.target }})
+
+    env:
+      CFG_RELEASE_CHANNEL: ${{ matrix.cfg_release_channel }}
+
+    # Note: Currently this workflow cross compiles for ARM on an x86_64 runner using
+    #       cross-compilation tools.  This is because the ARM64 runners aren't
+    #       currently available in GitHub Actions.  Once they are we can switch to using
+    #       native ARM64 runners.
+
+    strategy:
+      matrix:
+        include:
+          - target: "x86_64-unknown-linux-gnu"
+            os: "ubuntu-22.04"
+            arch_name: "amd64"
+            cfg_release_channel: "stable"
+          - target: "aarch64-unknown-linux-gnu"
+            os: "ubuntu-22.04"
+            arch_name: "arm64"
+            cfg_release_channel: "stable"
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Install cross-compilation tools for ARM
+      - name: Install cross-compilation tools (Linux)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      # Install rustup
+      - name: Install rustup
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
+          sh rustup-init.sh -y --default-toolchain ${{ matrix.cfg_release_channel }}
+          rustup target add ${{ matrix.target }}
+
+      # Verify rustup and cargo installation
+      - name: Verify installation
+        run: |
+          . "$HOME/.cargo/env"
+          rustup --version
+          cargo --version
+
+      # Install the required Rust target for cross-compilation
+      - name: Setup for cross-compilation
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          . "$HOME/.cargo/env"
+
+          echo "TARGET_CC=aarch64-linux-gnu-gcc" >> "${GITHUB_ENV}"
+          echo "TARGET_CXX=aarch64-linux-gnu-g++" >> "${GITHUB_ENV}"
+          echo "TARGET_AR=aarch64-linux-gnu-ar" >> "${GITHUB_ENV}"
+          echo "TARGET_RANLIB=aarch64-linux-gnu-ranlib" >> "${GITHUB_ENV}"
+
+          echo "BINDGEN_EXTRA_CLANG_ARGS=--sysroot=/usr/aarch64-linux-gnu" >> "${GITHUB_ENV}"
+
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          ar = "aarch64-linux-gnu-ar"
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+
+      # Cache the downloaded packages
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      # Build the project
+      - name: Build
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --verbose --target ${{ matrix.target }}
+
+      # Build the release version
+      - name: Build release version
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --release --target ${{ matrix.target }}
+
+      # Upload the built binaries
+      - name: Upload debug binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch_name }}-debug
+          path: target/${{ matrix.target }}/debug/ralfpack
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch_name }}
+          path: target/${{ matrix.target }}/release/ralfpack
+
+
+  package:
+    runs-on: ubuntu-22.04
+    name: Package for ${{ matrix.target }}
+    needs: build  # This job depends on the build job
+
+    strategy:
+      matrix:
+        include:
+          - target: "x86_64-unknown-linux-gnu"
+            arch_name: "amd64"
+          - target: "aarch64-unknown-linux-gnu"
+            arch_name: "arm64"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          TOML_VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          VERSION="${TOML_VERSION}+${SHORT_SHA}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-${{ matrix.arch_name }}
+          path: ./binaries
+
+      - name: Create Debian package
+        run: |
+          # Install required tools
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev debhelper
+          
+          # Create package structure
+          mkdir -p debian-package/DEBIAN
+          mkdir -p debian-package/usr/bin
+          
+          # Copy downloaded binary
+          cp binaries/ralfpack debian-package/usr/bin/
+          chmod +x debian-package/usr/bin/ralfpack
+            
+          # Create control file
+          cat > debian-package/DEBIAN/control << EOF
+          Package: ralfpack
+          Version: ${{ steps.get_version.outputs.version }}-1
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.arch_name }}
+          Maintainer: Sky UK <ben.gray@sky.uk>
+          Description: RalfPack utility
+           A Rust-based utility for working with RALF packages.
+          EOF
+          
+          # Build the package
+          dpkg-deb --build debian-package ralfpack_${{ steps.get_version.outputs.version }}_${{ matrix.arch_name }}.deb
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package-${{ matrix.arch_name }}
+          path: ralfpack_${{ steps.get_version.outputs.version }}_${{ matrix.arch_name }}.deb

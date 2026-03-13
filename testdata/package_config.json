@@ -1,0 +1,98 @@
+{
+  "id": "com.sky.myapp",
+  "version": "1.2.3",
+  "versionName": "1.2.3-beta",
+  "name": "My Application",
+  "packageType": "application",
+  "packageSpecifier": "html",
+  "entryPoint": "web/index.html",
+  "dependencies": {
+    "rdk.browser.wpe": ">=1.1.0"
+  },
+  "permissions": [
+    "urn:rdk:permission:home-app",
+    "urn:rdk:permission:internet",
+    "urn:rdk:permission:firebolt",
+    "urn:rdk:permission:thunder",
+    "urn:rdk:permission:rialto",
+    "urn:rdk:permission:game-controller",
+    "urn:rdk:permission:timeshift-buffer",
+    "urn:rdk:permission:external-storage:read",
+    "urn:rdk:permission:external-storage:write",
+    "urn:rdk:permission:display-overlay",
+    "urn:rdk:permission:compositor",
+    "urn:entos:permission:as-access:5",
+    "urn:entos:permission:as-player",
+    "urn:entos:permission:mediarite:api",
+    "urn:entos:permission:airplay",
+    "urn:entos:permission:chromecast",
+    "urn:entos:permission:bearer-token-authentication",
+    "urn:entos:permission:sky-live",
+    "urn:entos:permission:entitlements-info"
+  ],
+  "configuration": {
+    "urn:rdk:config:overrides": {
+      "application": {
+        "colorTheme": "vivid"
+      },
+      "runtime": {
+        "userAgent": "BBC_requirement_requesting_Operator_Specific_UserAgent",
+        "libInject": "oiptv.js",
+        "mTls": "/etc/certs/client_operator.cert"
+      }
+    },
+    "urn:rdk:config:log-levels": ["error", "warning", "info"],
+    "urn:rdk:config:dial": {
+      "appNames": ["MyMediaApp", "MediaRemote"],
+      "corsDomains": ["http://example.com", "https://my-media.com"],
+      "originHeaderRequired": true
+    },
+    "urn:rdk:config:application-lifecycle": {
+      "supportedNonActiveStates": ["paused", "suspended", "hibernated"],
+      "maxSuspendedSystemMemory": "16M",
+      "maxTimeToSuspendMemoryState": 10,
+      "startupTimeout": 60,
+      "watchdogInterval": 30
+    },
+    "urn:rdk:config:platform": {
+      "architecture": "arm",
+      "variant": "v7",
+      "os": "linux"
+    },
+    "urn:rdk:config:keys": {
+      "keyCapture": ["play", "pause", "stop", "fastForward", "rewind"],
+      "keyMonitor": ["volumeUp", "volumeDown", "mute"]
+    },
+    "urn:rdk:config:window": {
+      "virtualDisplaySize": 1080
+    },
+    "urn:rdk:config:memory": {
+      "system": "256M",
+      "gpu": "128M"
+    },
+    "urn:rdk:config:storage": {
+      "maxLocalStorage": "32M",
+      "sharedStorageAppId": "com.sky.myapp2"
+    },
+    "urn:rdk:config:network": [
+      {
+        "name": "netflix-mdx",
+        "port": 8009,
+        "protocol": "tcp",
+        "type": "public"
+      },
+      {
+        "name": "com.example.myapp.service",
+        "port": 1234,
+        "protocol": "tcp",
+        "type": "exported"
+      },
+      {
+        "name": "com.example.someotherapp.service",
+        "port": 4567,
+        "protocol": "tcp",
+        "type": "imported"
+      }
+    ]
+  }
+}

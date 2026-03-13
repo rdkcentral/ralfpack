@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<widget xmlns="http://www.bskyb.com/ns/widgets" version="2.0">
+    <name short="com.example.app" version="1.2.3-beta">ExampleApp</name>
+    <icon src="icon.png" type="image/png"/>
+    <content src="run-me.bin" type="application/system">
+        <platformFilters>
+            <platformId name="32B1"/>
+            <platformVariant name="DTH"/>
+            <region name="DEU"/>
+            <platformId name="32B2"/>
+            <region name="AUT"/>
+            <proposition name="SKYQ"/>
+            <country name="GBR"/>
+            <subdivision name="GBR-SCT"/>
+            <yoctoVersion name="KIRKSTONE"/>
+        </platformFilters>
+    </content>
+
+    <capabilities>
+        <capability name="home-app"/>
+
+        <capability name="firebolt"/>
+        <capability name="thunder"/>
+        <capability name="storage"/>
+        <capability name='local-services-1'/>
+        <capability name='wan-lan'/>
+
+        <capability name="as-player"/>
+
+        <capability name="chromecast"/>
+        <capability name="airplay2"/>
+
+        <capability name="private-storage">255</capability>
+        <capability name="log-levels">default,milestone,fatal</capability>
+        <capability name="issue-notifications"/>
+
+        <capability name="keymapping">search,voice,YouTube</capability>
+        <capability name="forward-keymapping">volume+,volume-,mute</capability>
+
+        <capability name="dial-app">https://www.youtube.com,https://*.youtube.com,package:*</capability>
+        <capability name="dial-id">uk.co.bbc.iPlayer,uk.co.bbc.Sport,uk.co.bbc.News</capability>
+        <capability name="dial-origin-mandatory"/>
+
+        <capability name="hole-punch">5001,9009</capability>
+
+        <capability name="stb-entitlements"/>
+
+        <capability name="game-mode"/>
+
+        <capability name="tsb-storage"/>
+
+        <capability name="virtual-resolution">1080</capability>
+
+        <capability name="sound-mode">DialogueEnhancement</capability>
+        <capability name="sound-scene">SportsFootball, SportsGolf, SportsCricket</capability>
+
+        <capability name="suspend-mode"/>
+        <capability name="hibernate-mode"/>
+
+        <capability name="voice-disabled"/>
+
+        <capability name="refresh-rate-60hz"/>
+
+        <capability name="pin-management">readwrite</capability>
+
+        <capability name="catalogue-id">DisneyPlus</capability>
+        <capability name="age-rating">16</capability>
+
+        <capability name="fkps">0381000003810001.key,0381000003810002.key</capability>
+
+        <capability name="cherry-app"></capability>
+        <capability name="bearer-token-authentication"></capability>
+
+        <capability name="mapi">Main:trusted;Foo:default,core</capability>
+
+        <capability name="child-app"></capability>
+
+        <capability name="sys-memory-limit">200m</capability>
+        <capability name="gpu-memory-limit">64m</capability>
+
+        <capability name="game-controller"></capability>
+
+        <capability name="start-timeout-sec">30</capability>
+        <capability name="watchdog-sec">15</capability>
+
+        <capability name="read-external-storage"/>
+        <capability name="write-external-storage"/>
+
+        <capability name="child-app">some.parent.app</capability>
+
+        <capability name="local-socket-server">1234</capability>
+        <capability name="local-socket-client">5678,89</capability>
+
+    </capabilities>
+</widget>

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema#",
+  "$id": "https://github.com/rdkcentral/oci-package-spec/blob/main/schema/package.schema.json",
+  "title": "Package Metadata Schema",
+  "description": "Schema defines a JSON structure that accurately represents the package metadata for use with OCI Packaging Format.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The id field is a unique identifier of the package. Typically, this is represented in a reverse domain notation.",
+      "type": "string",
+      "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
+    },
+    "version": {
+      "description": "The semantic version number of the package, this is strictly checked to ensure it contains numbers separated by periods",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(0|[1-9][0-9]{0,8})([.](0|[1-9][0-9]{0,8})){0,3}$"
+    },
+    "versionName": {
+      "description": "Optional version of the package as a user readable string.",
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "description": "User readable string that represents the name of the package.",
+      "type": "string",
+      "minLength": 1
+    },
+    "packageType": {
+      "description": "Package type information.",
+      "type": "string"
+    },
+    "packageSpecifier": {
+      "description": "Specifier type information.",
+      "type": "string"
+    },
+    "entryPoint": {
+      "description": "Path to the entry point within the package.",
+      "type": "string",
+      "minLength": 1
+    },
+    "dependencies": {
+      "description": "Dependencies are specified with a package name to version range. The version range is a string which has one or more space-separated descriptors. Dependencies can also be identified with a tarball, digest, tag or git URL.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "permissions": {
+      "description": "Section representing requested permission.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Permission string in URN notation."
+      },
+      "uniqueItems": true
+    },
+    "configuration": {
+      "description": "Package specific configuration.",
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": ["id", "version", "packageType", "entryPoint"],
+  "additionalProperties": false
+}

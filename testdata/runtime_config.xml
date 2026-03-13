@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.bskyb.com/ns/widgets" version="2.0">
+    <name short="com.sky.rdkbrowser" version="99.99.99">com.sky.rdkbrowser</name>
+    <icon src="icon.png" type="image/png"/>
+    <content src="SkyBrowserLauncher" type="runtime/html">
+    </content>
+</widget>

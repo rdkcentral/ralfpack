@@ -1,0 +1,126 @@
+#
+# If not stated otherwise in this file or this component's LICENSE file the
+# following copyright and licenses apply:
+#
+# Copyright 2025 Comcast Cable Communications Management, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+name: Build macOS
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.cfg_release_channel }} on ${{ matrix.os }})
+
+    # Timeout after
+    timeout-minutes: 20
+
+    # Build for both macOS architectures
+    strategy:
+      matrix:
+        include:
+          - target: "x86_64-apple-darwin"
+            os: "macos-13"
+            arch: "x86_64"
+            arch_name: "amd64"
+            cfg_release_channel: "stable"
+          - target: "aarch64-apple-darwin"
+            os: "macos-14"
+            arch: "aarch64"
+            arch_name: "arm64"
+            cfg_release_channel: "stable"
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Autotools is needed to build the erofs-utils C code
+      - name: Install autotools (macOS)
+        run: |
+          brew install autoconf automake libtool
+
+      # Install rustup
+      - name: Install rustup
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
+          sh rustup-init.sh -y --default-toolchain ${{ matrix.cfg_release_channel }}
+
+      # Verify rustup and cargo installation
+      - name: Verify installation
+        run: |
+          . "$HOME/.cargo/env"
+          rustup --version
+          cargo --version
+
+      # Cache the downloaded packages
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      # Build the project
+      - name: Build
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --verbose --target ${{ matrix.target }}
+
+      # Build the release version
+      - name: Build release version
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --release --target ${{ matrix.target }}
+
+      # Upload the built binaries
+      - name: Upload debug binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch_name }}-debug
+          path: target/${{ matrix.target }}/debug/ralfpack
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch_name }}
+          path: target/${{ matrix.target }}/release/ralfpack
+
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/debug/build/*
+            target/${{ matrix.target }}/release/build/*
