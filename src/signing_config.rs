@@ -353,7 +353,6 @@ impl SigningConfig {
             for cert_chain_path in &options.certificate_chain {
                 let cert_stack = process_pem_certificate_stack_file(cert_chain_path)?;
                 for cert_stack_cert in cert_stack.iter() {
-
                     // Check if we already have this certificate in the chain
                     let mut found = false;
                     if let Some(existing_chain) = &cert_chain {
@@ -487,10 +486,12 @@ impl SigningConfig {
         let mut signer = openssl::sign::Signer::new(openssl::hash::MessageDigest::sha256(), &self.key)
             .map_err(|err| format!("Failed to create signer: {}", err))?;
 
-        signer.update(data)
+        signer
+            .update(data)
             .map_err(|err| format!("Failed to sign data: {}", err))?;
 
-        let signature = signer.sign_to_vec()
+        let signature = signer
+            .sign_to_vec()
             .map_err(|err| format!("Failed to sign data: {}", err))?;
 
         Ok(signature)

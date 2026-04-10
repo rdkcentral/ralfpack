@@ -61,8 +61,7 @@ impl ErofsImageBuilder {
         let mtime = now.map(|d| d.as_secs()).unwrap_or(0);
 
         // Create a temporary file for creating the intermediate tar archive
-        let temp_file =
-            tempfile().expect("Failed to create temporary file for EROFS image generation");
+        let temp_file = tempfile().expect("Failed to create temporary file for EROFS image generation");
 
         ErofsImageBuilder {
             options: ErofsImageBuilderOptions {
@@ -88,13 +87,7 @@ impl ErofsImageBuilder {
     ///
     /// This just adds the file to the tar archive, the actual EROFS image is built when the
     /// `build` method is called.
-    pub fn append_data<P: AsRef<Path>, R: Read>(
-        &mut self,
-        path: P,
-        data: R,
-        size: usize,
-        mode: u32,
-    ) -> io::Result<()> {
+    pub fn append_data<P: AsRef<Path>, R: Read>(&mut self, path: P, data: R, size: usize, mode: u32) -> io::Result<()> {
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Regular);
         header.set_mtime(self.options.mtime);
@@ -107,10 +100,7 @@ impl ErofsImageBuilder {
         if let Some(tar_builder) = self.tar_builder.as_mut() {
             tar_builder.append_data(&mut header, path, data)
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Builder already finished",
-            ))
+            Err(io::Error::new(io::ErrorKind::Other, "Builder already finished"))
         }
     }
 
@@ -118,11 +108,7 @@ impl ErofsImageBuilder {
     ///
     /// This just adds the symlink to the tar archive, the actual EROFS image is built when the
     /// `build` method is called.
-    pub fn append_link<P: AsRef<Path>, T: AsRef<Path>>(
-        &mut self,
-        path: P,
-        target: T,
-    ) -> io::Result<()> {
+    pub fn append_link<P: AsRef<Path>, T: AsRef<Path>>(&mut self, path: P, target: T) -> io::Result<()> {
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Symlink);
         header.set_mtime(self.options.mtime);
@@ -134,10 +120,7 @@ impl ErofsImageBuilder {
         if let Some(tar_builder) = self.tar_builder.as_mut() {
             tar_builder.append_link(&mut header, path, target)
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Builder already finished",
-            ))
+            Err(io::Error::new(io::ErrorKind::Other, "Builder already finished"))
         }
     }
 
@@ -161,10 +144,7 @@ impl ErofsImageBuilder {
         if let Some(tar_builder) = self.tar_builder.as_mut() {
             tar_builder.append_data(&mut header, path, data)
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Builder already finished",
-            ))
+            Err(io::Error::new(io::ErrorKind::Other, "Builder already finished"))
         }
     }
 
@@ -181,10 +161,7 @@ impl ErofsImageBuilder {
         // Finish writing the tar archive
         let tar_builder = self.tar_builder.take();
         if tar_builder.is_none() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Builder already finished",
-            ));
+            return Err(io::Error::new(io::ErrorKind::Other, "Builder already finished"));
         }
 
         let mut tar_file = tar_builder.unwrap().into_inner()?;
