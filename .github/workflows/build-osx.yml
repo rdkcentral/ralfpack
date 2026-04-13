@@ -22,9 +22,9 @@ name: Build macOS
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -44,11 +44,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: "x86_64-apple-darwin"
-            os: "macos-13"
-            arch: "x86_64"
-            arch_name: "amd64"
-            cfg_release_channel: "stable"
           - target: "aarch64-apple-darwin"
             os: "macos-14"
             arch: "aarch64"
@@ -114,7 +109,6 @@ jobs:
         with:
           name: mac-${{ matrix.arch_name }}
           path: target/${{ matrix.target }}/release/ralfpack
-
 
       - name: Upload logs on failure
         if: failure()
