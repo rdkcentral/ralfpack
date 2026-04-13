@@ -40,7 +40,7 @@ jobs:
     # Timeout after
     timeout-minutes: 20
 
-    # Build for both macOS architectures
+    # Build for macOS ARM64 architecture
     strategy:
       matrix:
         include:
