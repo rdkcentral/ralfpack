@@ -22,6 +22,7 @@ use crate::package_config::PackageConfig;
 use crate::package_content::PackageContent;
 use crate::package_signature::*;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
 use tempfile::tempfile;
@@ -143,28 +144,29 @@ impl RalfPackage {
                 return Err("Invalid schemaVersion in image manifest".to_string());
             }
 
-            let config_path = format!(
-                "blobs/{}/{}",
-                manifest.config().digest().algorithm(),
-                manifest.config().digest().digest()
-            );
-            referenced_files.push(config_path);
-
-            for layer in manifest.layers() {
-                let layer_path = format!("blobs/{}/{}", layer.digest().algorithm(), layer.digest().digest());
-                referenced_files.push(layer_path);
-            }
-
             log::debug!(
                 "Found image manifest with config media type with digest {}",
                 descriptor.digest()
             );
 
-            // Check if the manifest is a package content manifest by looking at its config media type
+            // Only treat blobs referenced by manifests we actually trust/use as referenced.
+            // Unknown or unsupported manifests must not suppress unreferenced-file warnings.
             if Self::is_package_manifest(&manifest) {
                 if image_manifest.is_some() {
                     return Err("Multiple package manifests found in RALF package".to_string());
                 }
+
+                let config_path = format!(
+                    "blobs/{}/{}",
+                    manifest.config().digest().algorithm(),
+                    manifest.config().digest().digest()
+                );
+                referenced_files.push(config_path);
+                for layer in manifest.layers() {
+                    let layer_path = format!("blobs/{}/{}", layer.digest().algorithm(), layer.digest().digest());
+                    referenced_files.push(layer_path);
+                }
+
                 log::debug!(
                     "Found content manifest with config media type '{}' and digest {}",
                     manifest.config().media_type(),
@@ -173,9 +175,22 @@ impl RalfPackage {
                 image_manifest = Some(manifest);
                 image_manifest_digest = Some(descriptor.digest().clone());
             } else if Self::is_signature_manifest(&manifest) {
+                let config_path = format!(
+                    "blobs/{}/{}",
+                    manifest.config().digest().algorithm(),
+                    manifest.config().digest().digest()
+                );
+                referenced_files.push(config_path);
+
+                for layer in manifest.layers() {
+                    let layer_path = format!("blobs/{}/{}", layer.digest().algorithm(), layer.digest().digest());
+                    referenced_files.push(layer_path);
+                }
+
                 if signature_manifest.is_some() {
                     return Err("Multiple signature manifests found in RALF package".to_string());
                 }
+
                 log::debug!(
                     "Found signature manifest with config media type '{}' and digest {}",
                     manifest.config().media_type(),
@@ -598,6 +613,8 @@ impl RalfPackage {
         let mut unreferenced = Vec::new();
         let mut archive = self.reader.borrow_mut();
 
+        let referenced_files: HashSet<&str> = self.referenced_files.iter().map(|name| name.as_str()).collect();
+
         for i in 0..archive.len() {
             let file = archive
                 .by_index(i)
@@ -610,10 +627,12 @@ impl RalfPackage {
 
             let name = file.name().to_string();
 
-            if !self.referenced_files.contains(&name) {
+            if !referenced_files.contains(name.as_str()) {
                 unreferenced.push(name);
             }
         }
+
+        unreferenced.sort_unstable();
 
         Ok(unreferenced)
     }
