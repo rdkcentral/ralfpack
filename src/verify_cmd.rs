@@ -155,12 +155,19 @@ pub fn verify_package(args: VerifyArgs) -> Result<(), String> {
 
     let unreferenced_files = package.find_unreferenced_files()?;
     for file in unreferenced_files {
-        log::warn!("Found unreferenced file in package archive: {}", file);
+        log::warn!("Found unreferenced file in package archive: {}", escape_for_log(&file));
     }
 
     println!("Package signature verification succeeded");
 
     Ok(())
+}
+
+///
+/// Escape untrusted text before including it in logs so control characters
+/// cannot forge log lines or trigger terminal escape behavior.
+fn escape_for_log(value: &str) -> String {
+    value.chars().flat_map(|c| c.escape_default()).collect()
 }
 
 ///

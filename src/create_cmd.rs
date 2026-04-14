@@ -137,7 +137,7 @@ fn _desired_content_format<P: AsRef<Path>>(
                 Ok(PackageContentFormat::Tar)
             }
             PackageOutputFormat::Tar | PackageOutputFormat::Directory => {
-                // Plain tar is uncompressed, so use uncompressed tar for the image
+                // Plain tar/directory output is uncompressed, so use compressed tar for the image
                 Ok(PackageContentFormat::TarGz)
             }
         }
