@@ -22,7 +22,6 @@ use crate::package_config::PackageConfig;
 use crate::package_content::PackageContent;
 use crate::package_signature::*;
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
 use tempfile::tempfile;
@@ -599,8 +598,6 @@ impl RalfPackage {
         let mut unreferenced = Vec::new();
         let mut archive = self.reader.borrow_mut();
 
-        let referenced_files: HashSet<&str> = self.referenced_files.iter().map(|name| name.as_str()).collect();
-
         for i in 0..archive.len() {
             let file = archive
                 .by_index(i)
@@ -613,10 +610,16 @@ impl RalfPackage {
 
             let name = file.name().to_string();
 
-            if !referenced_files.contains(name.as_str()) {
+            if !self
+                .referenced_files
+                .iter()
+                .any(|referenced_name| referenced_name == &name)
+            {
                 unreferenced.push(name);
             }
         }
+
+        unreferenced.sort_unstable();
 
         Ok(unreferenced)
     }
