@@ -25,6 +25,26 @@ Documentation for the tool is available in the `doc` directory:
 * [ralfpack verify](doc/ralfpack_verify.md) - Verify a RALF package's signature
 * [ralfpack info](doc/ralfpack_info.md) - Display information about a RALF package
 
+## Building from source
+
+### Prerequisites
+Because `ralfpack` depends on some native C libraries (via `build.rs`), you must ensure a working C toolchain and autotools are available in your environment before compiling:
+* A C compiler (e.g., `gcc` or `clang`)
+* `ar`
+* `automake`
+* `autoconf`
+* `libtool`
+* `pkg-config`
+
+You will also need a standard Rust toolchain installed (e.g., via `rustup`).
+
+### Compiling
+To build the tool for release (optimized):
+```bash
+cargo build --release
+```
+The compiled binary will be available at `target/release/ralfpack`.
+
 ## How to use it
 Once built you can run the tool with the following command:
 ```bash
