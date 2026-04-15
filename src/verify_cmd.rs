@@ -117,7 +117,9 @@ pub fn verify_package(args: VerifyArgs) -> Result<(), String> {
 
         // We must have a signing certificate now
         if signing_info.certificate.is_none() {
-            return Err("No signing certificate found in package signature, and none provided on command line".to_string());
+            return Err(
+                "No signing certificate found in package signature, and none provided on command line".to_string(),
+            );
         }
         let cert = signing_info.certificate.as_ref().unwrap();
 
@@ -125,14 +127,11 @@ pub fn verify_package(args: VerifyArgs) -> Result<(), String> {
         let ca_store = parse_ca_roots(args.ca_roots.unwrap(), args.no_check_time)?;
 
         // Verify the certificate chain against the CA roots
-        verify_certificate_chain(
-            &cert,
-            &signing_info.certificate_chain,
-            &ca_store
-        )?;
+        verify_certificate_chain(&cert, &signing_info.certificate_chain, &ca_store)?;
 
         // It all checks out so extract the public key from the signing certificate
-        public_key = cert.public_key()
+        public_key = cert
+            .public_key()
             .map_err(|e| format!("Failed to extract public key from signing certificate: {}", e))?;
     }
 
@@ -154,9 +153,21 @@ pub fn verify_package(args: VerifyArgs) -> Result<(), String> {
     // and that their digests match.
     package.verify_all_content_blobs()?;
 
+    let unreferenced_files = package.find_unreferenced_files()?;
+    for file in unreferenced_files {
+        log::warn!("Found unreferenced file in package archive: {}", escape_for_log(&file));
+    }
+
     println!("Package signature verification succeeded");
 
     Ok(())
+}
+
+///
+/// Escape untrusted text before including it in logs so control characters
+/// cannot forge log lines or trigger terminal escape behavior.
+fn escape_for_log(value: &str) -> String {
+    value.chars().flat_map(|c| c.escape_default()).collect()
 }
 
 ///
@@ -185,10 +196,10 @@ fn parse_certificate_chain(path: PathBuf) -> Result<openssl::stack::Stack<openss
     let chain_certs = openssl::x509::X509::stack_from_pem(chain_data.as_slice())
         .map_err(|e| format!("Failed to parse certificate chain PEM file: {}", e))?;
 
-    let mut stack = openssl::stack::Stack::new()
-        .map_err(|e| format!("Failed to create certificate stack: {}", e))?;
+    let mut stack = openssl::stack::Stack::new().map_err(|e| format!("Failed to create certificate stack: {}", e))?;
     for cert in chain_certs {
-        stack.push(cert)
+        stack
+            .push(cert)
             .map_err(|e| format!("Failed to add certificate to stack: {}", e))?;
     }
 
@@ -207,7 +218,8 @@ fn parse_ca_roots(path: PathBuf, no_time_check: bool) -> Result<openssl::x509::s
         .map_err(|e| format!("Failed to create X509 store builder: {}", e))?;
 
     if no_time_check {
-        store_builder.set_flags(openssl::x509::verify::X509VerifyFlags::NO_CHECK_TIME)
+        store_builder
+            .set_flags(openssl::x509::verify::X509VerifyFlags::NO_CHECK_TIME)
             .map_err(|e| format!("Failed to set NO_CHECK_TIME flag on X509 store: {}", e))?;
     }
 
@@ -228,15 +240,14 @@ fn verify_certificate_chain(
     chain: &Option<openssl::stack::Stack<openssl::x509::X509>>,
     ca_roots: &openssl::x509::store::X509Store,
 ) -> Result<(), String> {
-
     // If no certificate chain was provided then use an empty stack
-    let empty_stack = openssl::stack::Stack::new()
-        .map_err(|e| format!("Failed to create empty certificate stack: {}", e))?;
+    let empty_stack =
+        openssl::stack::Stack::new().map_err(|e| format!("Failed to create empty certificate stack: {}", e))?;
     let chain_ref = chain.as_ref().unwrap_or(&empty_stack);
 
     // The X509 store context is used in a bit of a weird way in rust, look at the docs for details
-    let mut context = openssl::x509::X509StoreContext::new()
-        .map_err(|e| format!("Failed to create X509 store context: {}", e))?;
+    let mut context =
+        openssl::x509::X509StoreContext::new().map_err(|e| format!("Failed to create X509 store context: {}", e))?;
     let result = context
         .init(&ca_roots, &cert, &chain_ref, |c| c.verify_cert())
         .map_err(|e| format!("Certificate verification failed: {}", e))?;

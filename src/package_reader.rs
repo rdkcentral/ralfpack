@@ -22,6 +22,7 @@ use crate::package_config::PackageConfig;
 use crate::package_content::PackageContent;
 use crate::package_signature::*;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
 use tempfile::tempfile;
@@ -41,6 +42,9 @@ pub struct RalfPackage {
 
     /// The digest of the signature manifest, if present
     signature_manifest_digest: Option<oci_spec::image::Digest>,
+
+    /// A list of all files legally referenced by the OCI index
+    referenced_files: Vec<String>,
 }
 
 /// Information about a package signature
@@ -110,8 +114,17 @@ impl RalfPackage {
         let mut image_manifest_digest: Option<oci_spec::image::Digest> = None;
         let mut signature_manifest_digest: Option<oci_spec::image::Digest> = None;
 
+        let mut referenced_files = vec!["oci-layout".to_string(), "index.json".to_string()];
+
         // Store the parsed manifests from the index
         for descriptor in index.manifests() {
+            let manifest_path = format!(
+                "blobs/{}/{}",
+                descriptor.digest().algorithm(),
+                descriptor.digest().digest()
+            );
+            referenced_files.push(manifest_path);
+
             if *descriptor.media_type() != oci_spec::image::MediaType::ImageManifest {
                 continue;
             }
@@ -136,11 +149,24 @@ impl RalfPackage {
                 descriptor.digest()
             );
 
-            // Check if the manifest is a package content manifest by looking at its config media type
+            // Only treat blobs referenced by manifests we actually trust/use as referenced.
+            // Unknown or unsupported manifests must not suppress unreferenced-file warnings.
             if Self::is_package_manifest(&manifest) {
                 if image_manifest.is_some() {
                     return Err("Multiple package manifests found in RALF package".to_string());
                 }
+
+                let config_path = format!(
+                    "blobs/{}/{}",
+                    manifest.config().digest().algorithm(),
+                    manifest.config().digest().digest()
+                );
+                referenced_files.push(config_path);
+                for layer in manifest.layers() {
+                    let layer_path = format!("blobs/{}/{}", layer.digest().algorithm(), layer.digest().digest());
+                    referenced_files.push(layer_path);
+                }
+
                 log::debug!(
                     "Found content manifest with config media type '{}' and digest {}",
                     manifest.config().media_type(),
@@ -149,9 +175,22 @@ impl RalfPackage {
                 image_manifest = Some(manifest);
                 image_manifest_digest = Some(descriptor.digest().clone());
             } else if Self::is_signature_manifest(&manifest) {
+                let config_path = format!(
+                    "blobs/{}/{}",
+                    manifest.config().digest().algorithm(),
+                    manifest.config().digest().digest()
+                );
+                referenced_files.push(config_path);
+
+                for layer in manifest.layers() {
+                    let layer_path = format!("blobs/{}/{}", layer.digest().algorithm(), layer.digest().digest());
+                    referenced_files.push(layer_path);
+                }
+
                 if signature_manifest.is_some() {
                     return Err("Multiple signature manifests found in RALF package".to_string());
                 }
+
                 log::debug!(
                     "Found signature manifest with config media type '{}' and digest {}",
                     manifest.config().media_type(),
@@ -178,6 +217,7 @@ impl RalfPackage {
             image_manifest_digest: image_manifest_digest.unwrap(),
             signature_manifest,
             signature_manifest_digest,
+            referenced_files,
         })
     }
 
@@ -307,7 +347,8 @@ impl RalfPackage {
                     let mut cert_stack_x509 = openssl::stack::Stack::new()
                         .map_err(|e| format!("Failed to create certificate stack: {}", e))?;
                     for cert in cert_chain_x509 {
-                        cert_stack_x509.push(cert)
+                        cert_stack_x509
+                            .push(cert)
                             .map_err(|e| format!("Failed to add certificate to stack: {}", e))?;
                     }
 
@@ -564,5 +605,85 @@ impl RalfPackage {
     fn read_blob_to_file(&self, descriptor: &oci_spec::image::Descriptor, file: &mut File) -> Result<(), String> {
         let mut archive = self.reader.borrow_mut();
         Self::read_blob(&mut archive, descriptor, file)
+    }
+
+    /// Returns a list of files present in the archive that are not legally
+    /// referenced by the OCI index or manifests.
+    pub fn find_unreferenced_files(&self) -> Result<Vec<String>, String> {
+        let mut unreferenced = Vec::new();
+        let mut archive = self.reader.borrow_mut();
+
+        let referenced_files: HashSet<&str> = self.referenced_files.iter().map(|name| name.as_str()).collect();
+
+        for i in 0..archive.len() {
+            let file = archive
+                .by_index(i)
+                .map_err(|e| format!("Failed to read archive entry: {}", e))?;
+
+            // We only care about files, not directories
+            if file.is_dir() {
+                continue;
+            }
+
+            let name = file.name().to_string();
+
+            if !referenced_files.contains(name.as_str()) {
+                unreferenced.push(name);
+            }
+        }
+
+        unreferenced.sort_unstable();
+
+        Ok(unreferenced)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::str::FromStr;
+    use tempfile::NamedTempFile;
+    use zip::write::FileOptions;
+
+    #[test]
+    fn test_find_unreferenced_files() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let mut zip = zip::ZipWriter::new(&mut temp_file);
+        let options: FileOptions<()> = FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+        // Write the mandatory oci-layout file and index.json
+        zip.start_file("oci-layout", options).unwrap();
+        zip.write_all(b"{\"imageLayoutVersion\": \"1.0.0\"}").unwrap();
+
+        zip.start_file("index.json", options).unwrap();
+        let index_json = r#"{
+            "schemaVersion": 2,
+            "manifests": []
+        }"#;
+        zip.write_all(index_json.as_bytes()).unwrap();
+
+        // Inject an unreferenced rogue file (the vulnerability simulation)
+        zip.start_file("malicious_file.sh", options).unwrap();
+        zip.write_all(b"echo 'malicious'").unwrap();
+
+        zip.finish().unwrap();
+
+        // We open the archive, ignoring any missing manifest errors by manually parsing the files
+        let file = File::open(temp_file.path()).unwrap();
+        let archive = zip::read::ZipArchive::new(file).unwrap();
+
+        let package = RalfPackage {
+            reader: RefCell::new(archive),
+            image_manifest: oci_spec::image::ImageManifest::from_reader(std::io::Cursor::new(b"{\"schemaVersion\": 2, \"config\": {\"mediaType\": \"application/vnd.oci.image.config.v1+json\", \"digest\": \"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\", \"size\": 0}, \"layers\": []}")).unwrap(),
+            image_manifest_digest: oci_spec::image::Digest::from_str("sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").unwrap(),
+            signature_manifest: None,
+            signature_manifest_digest: None,
+            referenced_files: vec!["oci-layout".to_string(), "index.json".to_string()],
+        };
+
+        let unreferenced = package.find_unreferenced_files().unwrap();
+        assert_eq!(unreferenced.len(), 1);
+        assert_eq!(unreferenced[0], "malicious_file.sh");
     }
 }

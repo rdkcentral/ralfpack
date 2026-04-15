@@ -97,38 +97,48 @@ pub struct CreateArgs {
 fn _desired_content_format<P: AsRef<Path>>(
     package_format: &PackageOutputFormat,
     content_path: P,
-) -> PackageContentFormat {
+) -> Result<PackageContentFormat, String> {
     // If the path doesn't exist then we cannot determine the size
     if !content_path.as_ref().exists() {
-        panic!("Content path {:?} does not exist", content_path.as_ref());
+        return Err(format!("Content path {:?} does not exist", content_path.as_ref()));
     }
 
     // If it's a file then we need to check if it's an archive and get the extracted size
     let total_size: u64;
     if content_path.as_ref().is_file() {
         // It's a file, so assume it's an archive and get the extracted size
-        total_size = utils::archive_extracted_size(&content_path).expect(&format!(
-            "Failed to determine uncompressed size of {:?}",
-            content_path.as_ref()
-        ));
+        match utils::archive_extracted_size(&content_path) {
+            Ok(size) => total_size = size,
+            Err(e) => {
+                return Err(format!(
+                    "Failed to determine uncompressed size of {:?}: {}",
+                    content_path.as_ref(),
+                    e
+                ));
+            }
+        }
     } else {
         // It's a directory, so get the size of the directory
-        total_size = fs_extra::dir::get_size(&content_path)
-            .expect(&format!("Failed to get size of {:?}", content_path.as_ref()));
+        match fs_extra::dir::get_size(&content_path) {
+            Ok(size) => total_size = size,
+            Err(e) => {
+                return Err(format!("Failed to get size of {:?}: {}", content_path.as_ref(), e));
+            }
+        }
     }
 
     // If the total size is greater than 1MB, then we use EROFS, otherwise we use tar
     if total_size > (1 * 1024 * 1024) {
-        PackageContentFormat::ErofsLz4
+        Ok(PackageContentFormat::ErofsLz4)
     } else {
         match package_format {
             PackageOutputFormat::Zip => {
                 // Zip is compressed, so use uncompressed tar for the image as will be compressed in the zip
-                PackageContentFormat::Tar
+                Ok(PackageContentFormat::Tar)
             }
             PackageOutputFormat::Tar | PackageOutputFormat::Directory => {
-                // Plain tar is uncompressed, so use uncompressed tar for the image
-                PackageContentFormat::TarGz
+                // Plain tar/directory output is uncompressed, so use compressed tar for the image
+                Ok(PackageContentFormat::TarGz)
             }
         }
     }
@@ -174,7 +184,7 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     // Check if the image format is specified, if not we need to guess it based on the content size
     let image_format: PackageContentFormat;
     if args.image_format.is_none() {
-        image_format = _desired_content_format(&package_format, &args.content);
+        image_format = _desired_content_format(&package_format, &args.content)?;
     } else {
         image_format = args.image_format.unwrap();
     }
@@ -286,4 +296,36 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     println!("Created {}", args.ralf_package.display());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_desired_content_format_invalid_archive() {
+        // Create a temporary file with invalid archive content (no magic bytes)
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        temp_file.write_all(b"AAAA").unwrap();
+
+        let package_format = PackageOutputFormat::Zip;
+        let result = _desired_content_format(&package_format, temp_file.path());
+
+        assert!(
+            result.is_err(),
+            "Expected an error for invalid archive format, but got OK"
+        );
+        let err_msg = result.unwrap_err();
+        assert!(
+            err_msg.contains("Failed to determine uncompressed size of"),
+            "Error message did not match expected pattern: {}",
+            err_msg
+        );
+        assert!(
+            err_msg.contains("Unknown archive format"),
+            "Error message did not match expected pattern: {}",
+            err_msg
+        );
+    }
 }
