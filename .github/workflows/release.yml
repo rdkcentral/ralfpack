@@ -31,6 +31,8 @@ jobs:
   build-linux:
     runs-on: ubuntu-22.04
     name: Build Linux (${{ matrix.arch_name }})
+    permissions:
+      contents: read
 
     strategy:
       matrix:
@@ -125,6 +127,8 @@ jobs:
   build-macos:
     runs-on: macos-14
     name: Build macOS (${{ matrix.arch_name }})
+    permissions:
+      contents: read
 
     strategy:
       matrix:
