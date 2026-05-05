@@ -31,6 +31,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-22.04
     name: Build Linux (${{ matrix.arch_name }})
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -49,30 +50,27 @@ jobs:
           lfs: "true"
           fetch-depth: 2
 
-      # Install cross-compilation tools for ARM
-      - name: Install cross-compilation tools (Linux)
+      - name: Install cross-compilation tools
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
-      - name: Install rustup
+      - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
-          sh rustup-init.sh -y --default-toolchain stable
+          sh rustup-init.sh -y --default-toolchain stable --profile minimal
           . "$HOME/.cargo/env"
           rustup target add ${{ matrix.target }}
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Setup for cross-compilation
+      - name: Setup cross-compilation environment
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          . "$HOME/.cargo/env"
-
           echo "TARGET_CC=aarch64-linux-gnu-gcc" >> "${GITHUB_ENV}"
           echo "TARGET_CXX=aarch64-linux-gnu-g++" >> "${GITHUB_ENV}"
           echo "TARGET_AR=aarch64-linux-gnu-ar" >> "${GITHUB_ENV}"
           echo "TARGET_RANLIB=aarch64-linux-gnu-ranlib" >> "${GITHUB_ENV}"
-
           echo "BINDGEN_EXTRA_CLANG_ARGS=--sysroot=/usr/aarch64-linux-gnu" >> "${GITHUB_ENV}"
 
           mkdir -p ~/.cargo
@@ -82,24 +80,27 @@ jobs:
           linker = "aarch64-linux-gnu-gcc"
           EOF
 
-      - name: Build release version
-        run: |
-          . "$HOME/.cargo/env"
-          cargo build --release --target ${{ matrix.target }}
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Prepare binary
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare assets
         run: |
           mkdir -p release-assets
-          cp target/${{ matrix.target }}/release/ralfpack release-assets/ralfpack-linux-${{ matrix.arch_name }}
-
-      - name: Get version
-        id: get_version
-        run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create Debian package
-        run: |
+          
+          # Copy binary
+          cp target/${{ matrix.target }}/release/ralfpack release-assets/ralfpack-linux-${{ matrix.arch_name }}
+          
+          # Create Debian package
           sudo apt-get update && sudo apt-get install -y dpkg-dev debhelper
           mkdir -p debian-package/DEBIAN
           mkdir -p debian-package/usr/bin
@@ -107,7 +108,7 @@ jobs:
           chmod +x debian-package/usr/bin/ralfpack
           cat > debian-package/DEBIAN/control << EOF
           Package: ralfpack
-          Version: ${{ steps.get_version.outputs.version }}
+          Version: $VERSION
           Section: utils
           Priority: optional
           Architecture: ${{ matrix.arch_name }}
@@ -115,8 +116,8 @@ jobs:
           Description: RalfPack utility
            A Rust-based utility for working with RALF packages.
           EOF
-          dpkg-deb --build debian-package ralfpack_${{ steps.get_version.outputs.version }}_${{ matrix.arch_name }}.deb
-          cp ralfpack_${{ steps.get_version.outputs.version }}_${{ matrix.arch_name }}.deb release-assets/
+          dpkg-deb --build debian-package ralfpack_${VERSION}_${{ matrix.arch_name }}.deb
+          cp ralfpack_${VERSION}_${{ matrix.arch_name }}.deb release-assets/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -124,8 +125,63 @@ jobs:
           name: linux-assets-${{ matrix.arch_name }}
           path: release-assets/*
 
+  build-macos:
+    runs-on: ${{ matrix.os }}
+    name: Build macOS (${{ matrix.arch_name }})
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        include:
+          - target: "aarch64-apple-darwin"
+            os: "macos-14"
+            arch_name: "arm64"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: "true"
+          fetch-depth: 2
+
+      - name: Install dependencies (macOS)
+        run: brew install autoconf automake libtool
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
+          sh rustup-init.sh -y --default-toolchain stable --profile minimal
+          . "$HOME/.cargo/env"
+          rustup target add ${{ matrix.target }}
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare assets
+        run: |
+          mkdir -p release-assets
+          cp target/${{ matrix.target }}/release/ralfpack release-assets/ralfpack-macos-${{ matrix.arch_name }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-assets-${{ matrix.arch_name }}
+          path: release-assets/*
+
   publish:
-    needs: [build-linux]
+    needs: [build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -135,9 +191,6 @@ jobs:
         with:
           path: all-assets
           merge-multiple: true
-
-      - name: List assets
-        run: ls -R all-assets
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
