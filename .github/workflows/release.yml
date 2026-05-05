@@ -124,59 +124,8 @@ jobs:
           name: linux-assets-${{ matrix.arch_name }}
           path: release-assets/*
 
-  build-macos:
-    runs-on: macos-14
-    name: Build macOS (${{ matrix.arch_name }})
-    permissions:
-      contents: read
-
-    strategy:
-      matrix:
-        include:
-          - target: "x86_64-apple-darwin"
-            arch: "x86_64"
-            arch_name: "amd64"
-          - target: "aarch64-apple-darwin"
-            arch: "aarch64"
-            arch_name: "arm64"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          lfs: "true"
-          fetch-depth: 2
-
-      # Autotools is needed to build the erofs-utils C code
-      - name: Install autotools (macOS)
-        run: |
-          brew install autoconf automake libtool
-
-      - name: Install rustup
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
-          sh rustup-init.sh -y --default-toolchain stable
-          . "$HOME/.cargo/env"
-          rustup target add ${{ matrix.target }}
-
-      - name: Build release version
-        run: |
-          . "$HOME/.cargo/env"
-          cargo build --release --target ${{ matrix.target }}
-
-      - name: Prepare binary
-        run: |
-          mkdir -p release-assets
-          cp target/${{ matrix.target }}/release/ralfpack release-assets/ralfpack-macos-${{ matrix.arch_name }}
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-assets-${{ matrix.arch_name }}
-          path: release-assets/*
-
   publish:
-    needs: [build-linux, build-macos]
+    needs: [build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
