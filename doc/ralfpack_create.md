@@ -30,10 +30,14 @@ ralfpack create --content <path to directory or archive> --config <path to json 
 ```
   -i, --content <CONTENT>                        The path to a directory or archive containing the content to be packaged
   -c, --config <CONFIG>                          The path to a JSON file containing the package configuration
-      --no-schema-check                          Disabled the JSON schema check on the configuration file
+      --no-schema-check                          Disables the JSON schema check on the configuration file
       --image-format <IMAGE_FORMAT>              The format to use for the package content image. The tool supports tar with optional compression (gzip or zstd)
                                                  and EROFS images.  By default, the tool will use tar for small packages and EROFS for larger packages. Possible
-                                                 values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4' & 'erofs.zstd'
+                                                 values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4', 'erofs.zstd' &
+                                                 'erofs.nocmpr' (uncompressed)
+  -T, --ignore-mtime [<UNIX_TIME>]               Sets the modification time for all files in the package content image. If specified without a value,
+                                                 uses the current time. If a Unix timestamp is provided, uses that timestamp for all files. If not
+                                                 specified, preserves the original modification times from the content source
       --annotations <ANNOTATIONS>                TODO: Include extra key=value annotations in the package
       --auxiliary-content <AUXILIARY_CONTENT>    TODO: Include an auxiliary metadata file in the package
       --pkcs12 <PKCS12>                          The path to PKCS12 (.p12) file containing the certificate(s) and private key for signing
@@ -44,7 +48,7 @@ ralfpack create --content <path to directory or archive> --config <path to json 
       --certificate <CERTIFICATE>                Path to the X.509 certificate in PEM format to include in the OCI Signature
       --certificate-chain <CERTIFICATE_CHAIN>    Path to a PEM file containing one or more X.509 certificates to include in the OCI Signature to build the
                                                  certificate chain for verifying the signing certificate. This optional argument can be specified multiple times
-                                                 to include multiple discrete X.509 certificates. These certificates ate included in the package signature
+                                                 to include multiple discrete X.509 certificates. These certificates are included in the package signature
       --signature-identity <SIGNATURE_IDENTITY>  Manually set the .critical.docker-reference field in the Signature to the given value. By default, this is set
                                                  to the package id (e.g. com.example.myapp)
       --skip-certificate-expiry-check            Skip the check on the expiry of the signing certificate (and optional chain).  By default, the tool checks that

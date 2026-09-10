@@ -6,6 +6,7 @@
   "packageType": "application",
   "packageSpecifier": "html",
   "entryPoint": "web/index.html",
+  "entryArgs": ["--enable-feature-x", "--set-mode=dark"],
   "dependencies": {
     "rdk.browser.wpe": ">=1.1.0"
   },

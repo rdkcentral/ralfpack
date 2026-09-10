@@ -5,8 +5,8 @@ Displays information on the signature of a RALF package.
 ### Synopsis
 
 Prints information on the signature of a RALF package, including details of the signing certificate and any
-certificate chain included in the signature.  This is useful to inspect the signature who signed the package and
-when the signing certificate(s) expire.
+certificate chain included in the signature. This is useful for inspecting who signed the package and when
+the signing certificate(s) expire.
 
 It is possible to sign a RALF package without including the signing certificate or certificate chain in the signature,
 in which case this tool will indicate that no signing certificate is present.

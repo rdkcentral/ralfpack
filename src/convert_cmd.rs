@@ -82,6 +82,13 @@ pub struct ConvertArgs {
     #[arg(long)]
     remove_configxml: bool,
 
+    /// Sets the modification time for all files in the package content image.
+    /// If specified without a value, uses the current time.
+    /// If a Unix timestamp is provided, uses that timestamp for all files.
+    /// If not specified, preserves the original modification times from the widget.
+    #[arg(short = 'T', long)]
+    ignore_mtime: Option<Option<u64>>,
+
     /// Output package path
     ralf_package: PathBuf,
 }

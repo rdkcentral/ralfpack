@@ -64,6 +64,13 @@ pub struct CreateArgs {
     #[arg(long)]
     image_format: Option<PackageContentFormat>,
 
+    /// Sets the modification time for all files in the package content image.
+    /// If specified without a value, uses the current time.
+    /// If a Unix timestamp is provided, uses that timestamp for all files.
+    /// If not specified, preserves the original modification times from the content source.
+    #[arg(short = 'T', long)]
+    ignore_mtime: Option<Option<u64>>,
+
     /// TODO: Include extra key=value annotations in the package.
     #[arg(long)]
     annotations: Option<String>,

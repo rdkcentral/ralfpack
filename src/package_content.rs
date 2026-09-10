@@ -258,6 +258,9 @@ pub struct PackageContentBuilder {
 
     /// The current size of the content written
     total_size: usize,
+
+    /// The default modification time to use for all files if not provided from original content
+    default_mtime: u64,
 }
 
 struct PackageContentBuilderOptions {
@@ -265,8 +268,8 @@ struct PackageContentBuilderOptions {
     format: PackageContentFormat,
 
     /// The time in seconds since the UNIX epoch that all files and directories in the package
-    /// content should be set to.
-    mtime: u64,
+    /// content should be set to.  If not set then use the mtime of the source directory / file.
+    mtime: Option<u64>,
 
     /// The maximum size of the package content.  This is used as a sanity check to avoid
     /// creating packages that are too large to actually run on devices.
@@ -289,7 +292,7 @@ impl PackageContentBuilder {
         let mut builder = PackageContentBuilder {
             options: PackageContentBuilderOptions {
                 format: format.clone(),
-                mtime: 0,
+                mtime: None,
                 size_limit: None,
                 entry_limit: None,
                 exclusion_list: Vec::new(),
@@ -298,11 +301,12 @@ impl PackageContentBuilder {
             erofs_builder: None,
             total_entries: 0,
             total_size: 0,
+            default_mtime: 0,
         };
 
         // By default, for mtime, use the current time in seconds since the UNIX epoch
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-        builder.options.mtime = now.map(|d| d.as_secs()).unwrap_or(0);
+        builder.default_mtime = now.map(|d| d.as_secs()).unwrap_or(0);
 
         // If the format is plain tar file, then can just create a tar writer around the Write
         // object. If format is tar with compression then we also create a tar writer, but around
@@ -356,6 +360,16 @@ impl PackageContentBuilder {
     /// This is used as a sanity check
     pub fn set_entry_limit(&mut self, limit: usize) -> &mut Self {
         self.options.entry_limit = Some(limit);
+        self
+    }
+
+    /// Sets the modification time for all files and directories in the content.
+    #[allow(dead_code)]
+    pub fn set_fixed_modtime(&mut self, mtime: u64) -> &mut Self {
+        self.options.mtime = Some(mtime);
+        if let Some(erofs_builder) = self.erofs_builder.as_mut() {
+            erofs_builder.fixed_modtime(mtime);
+        }
         self
     }
 
@@ -434,7 +448,13 @@ impl PackageContentBuilder {
     ///
     /// This function will also check the size limit and entry limit and if they are exceeded then
     /// an error is returned.
-    pub fn append_file<P: AsRef<Path>, R: io::Read>(&mut self, path: P, data: &mut R, size: usize) -> io::Result<()> {
+    pub fn append_file<P: AsRef<Path>, R: io::Read>(
+        &mut self,
+        path: P,
+        data: &mut R,
+        size: usize,
+        mtime: u64,
+    ) -> io::Result<()> {
         // Check the entry limit
         self._increment_and_check_limits(size, 1)?;
 
@@ -457,11 +477,14 @@ impl PackageContentBuilder {
             mode = Self::_guess_file_mode(&path, &buf);
         }
 
+        // Determine which modification time to use
+        let actual_mtime = self.options.mtime.unwrap_or(mtime);
+
         // Write the data into the content
         if let Some(tar_builder) = self.tar_builder.as_mut() {
             let mut header = tar::Header::new_gnu();
             header.set_entry_type(tar::EntryType::Regular);
-            header.set_mtime(self.options.mtime);
+            header.set_mtime(actual_mtime);
             header.set_mode(mode);
             header.set_uid(0);
             header.set_gid(0);
@@ -470,7 +493,7 @@ impl PackageContentBuilder {
 
             tar_builder.append_data(&mut header, path, buf_reader)
         } else if let Some(erofs_builder) = self.erofs_builder.as_mut() {
-            erofs_builder.append_data(path, buf_reader, size, mode)
+            erofs_builder.append_data(path, buf_reader, size, mode, actual_mtime)
         } else {
             Err(io::Error::new(io::ErrorKind::Other, "No builder initialized"))
         }
@@ -479,7 +502,7 @@ impl PackageContentBuilder {
     /// Appends a symlink to the content.
     ///
     /// If the path matches a path in the exclusion list then the symlink is skipped.
-    pub fn append_link<P: AsRef<Path>, T: AsRef<Path>>(&mut self, path: P, target: T) -> io::Result<()> {
+    pub fn append_link<P: AsRef<Path>, T: AsRef<Path>>(&mut self, path: P, target: T, mtime: u64) -> io::Result<()> {
         // Check the size limit and entry limit
         let target_len = path.as_ref().to_str().unwrap().len();
         self._increment_and_check_limits(target_len, 1)?;
@@ -495,18 +518,21 @@ impl PackageContentBuilder {
             return Err(io::Error::new(io::ErrorKind::Other, "Absolute paths are not allowed"));
         }
 
+        // Determine which modification time to use
+        let actual_mtime = self.options.mtime.unwrap_or(mtime);
+
         // Add the symlink to tha tarball
         if let Some(tar_builder) = self.tar_builder.as_mut() {
             let mut header = tar::Header::new_gnu();
             header.set_entry_type(tar::EntryType::Symlink);
-            header.set_mtime(self.options.mtime);
+            header.set_mtime(actual_mtime);
             header.set_uid(0);
             header.set_gid(0);
             header.set_size(0);
 
             tar_builder.append_link(&mut header, path, target)
         } else if let Some(erofs_builder) = self.erofs_builder.as_mut() {
-            erofs_builder.append_link(path, target)
+            erofs_builder.append_link(path, target, actual_mtime)
         } else {
             Err(io::Error::new(io::ErrorKind::Other, "No builder initialized"))
         }
@@ -519,7 +545,7 @@ impl PackageContentBuilder {
     /// It's not required to add a directory entry, but it is recommended to do so because you
     /// can explicitly set the mode of the directory.  This may also be required if want to add
     /// an empty directory to the archive.
-    pub fn append_dir<P: AsRef<Path>>(&mut self, path: P, mode: u32) -> io::Result<()> {
+    pub fn append_dir<P: AsRef<Path>>(&mut self, path: P, mode: u32, mtime: u64) -> io::Result<()> {
         // Check the entry limit
         self._increment_and_check_limits(0, 1)?;
 
@@ -533,14 +559,17 @@ impl PackageContentBuilder {
             return Err(io::Error::new(io::ErrorKind::Other, "Absolute paths are not allowed"));
         }
 
+        // Determine which modification time to use
+        let actual_mtime = self.options.mtime.unwrap_or(mtime);
+
         // Add the directory to the tarball
         if let Some(tar_builder) = self.tar_builder.as_mut() {
             // Can't use tar::Builder::append_dir here as it sets the mode to match the source
             // directory mode, and we want to set our own mode.
             let mut header = tar::Header::new_gnu();
             header.set_entry_type(tar::EntryType::Directory);
+            header.set_mtime(actual_mtime);
             header.set_mode(mode);
-            header.set_mtime(self.options.mtime);
             header.set_uid(0);
             header.set_gid(0);
             header.set_size(0);
@@ -551,7 +580,7 @@ impl PackageContentBuilder {
 
             tar_builder.append_data(&mut header, path, data)
         } else if let Some(erofs_builder) = self.erofs_builder.as_mut() {
-            erofs_builder.append_dir(path, mode)
+            erofs_builder.append_dir(path, mode, actual_mtime)
         } else {
             Err(io::Error::new(io::ErrorKind::Other, "No builder initialized"))
         }
@@ -587,15 +616,25 @@ impl PackageContentBuilder {
                 continue;
             }
 
+            // Get the modification time from the metadata
+            let mut mtime = self.default_mtime;
+            if let Ok(metadata) = entry.metadata() {
+                if let Ok(modified_time) = metadata.modified() {
+                    if let Ok(modified_time_epoch) = modified_time.duration_since(SystemTime::UNIX_EPOCH) {
+                        mtime = modified_time_epoch.as_secs() as u64;
+                    }
+                }
+            }
+
             // Not excluded, so add to the contents
             if file_type.is_file() {
                 let size = entry.metadata()?.len() as usize;
-                self.append_file(relative_path, &mut fs::File::open(file_path)?, size)?;
+                self.append_file(relative_path, &mut fs::File::open(file_path)?, size, mtime)?;
             } else if file_type.is_dir() {
-                self.append_dir(relative_path, 0o755)?;
+                self.append_dir(relative_path, 0o755, mtime)?;
             } else if file_type.is_symlink() {
                 let symlink_target = file_path.read_link()?;
-                self.append_link(relative_path, symlink_target)?;
+                self.append_link(relative_path, symlink_target, mtime)?;
             } else {
                 log::warn!(
                     "Ignoring file {} in directory - don't currently support that file type",
@@ -631,12 +670,20 @@ impl PackageContentBuilder {
                 continue;
             }
 
+            // Get the modification time from the zip entry if available
+            let mut mtime = self.default_mtime;
+            if let Some(modified_time) = entry.last_modified() {
+                if let Ok(dt) = time::OffsetDateTime::try_from(modified_time) {
+                    mtime = dt.unix_timestamp() as u64;
+                }
+            }
+
             // Add the file or directory to the content
             if entry.is_file() {
                 let size = entry.size() as usize;
-                self.append_file(&path, &mut entry, size)?
+                self.append_file(&path, &mut entry, size, mtime)?
             } else if entry.is_dir() {
-                self.append_dir(&path, 0o755)?
+                self.append_dir(&path, 0o755, mtime)?
             } else if entry.is_symlink() {
                 // Although zip files can sorta contain symlinks, it's never been supported in the
                 // Sky stack, so we just ignore them for now with a warning
@@ -665,19 +712,25 @@ impl PackageContentBuilder {
                 continue;
             }
 
+            // Get the modification time from the zip entry if available
+            let mut mtime = self.default_mtime;
+            if let Ok(modified_time) = entry.header().mtime() {
+                mtime = modified_time;
+            }
+
             // Add the file or directory to the content
             let entry_type = entry.header().entry_type();
             if entry_type == tar::EntryType::Regular {
                 let entry_size = entry.size() as usize;
-                self.append_file(&path, &mut entry, entry_size)?;
+                self.append_file(&path, &mut entry, entry_size, mtime)?;
             } else if entry_type == tar::EntryType::Directory {
-                self.append_dir(&path, 0o755)?
+                self.append_dir(&path, 0o755, mtime)?
             } else if entry_type == tar::EntryType::Symlink {
                 let link_name = entry.link_name()?;
                 if link_name.is_none() {
                     log::warn!("Ignoring symlink {} in tar file", path.display());
                 } else {
-                    self.append_link(&path, link_name.unwrap())?;
+                    self.append_link(&path, link_name.unwrap(), mtime)?;
                 }
             } else {
                 log::warn!("Ignoring file {} in tar", path.display());

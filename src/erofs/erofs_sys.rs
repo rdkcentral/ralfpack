@@ -35,11 +35,16 @@ use std::os::raw::c_void;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-pub fn erofs_global_config(algo: CompressionAlgo) -> io::Result<()> {
+pub fn erofs_global_config(algo: CompressionAlgo, fixed_modtime: Option<u64>) -> io::Result<()> {
     let fs_uuid = Uuid::new_v4();
 
-    let fs_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-    let fs_time_secs = fs_time.map(|d| d.as_secs()).unwrap_or(0);
+    let mut fs_time_secs;
+    if let Some(mtime) = fixed_modtime {
+        fs_time_secs = mtime;
+    } else {
+        let fs_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
+        fs_time_secs = fs_time.map(|d| d.as_secs()).unwrap_or(0);
+    }
 
     unsafe {
         // the erofs-utils uses two global variables / structures defined in <erofs-utils>/config.c
@@ -66,7 +71,7 @@ pub fn erofs_global_config(algo: CompressionAlgo) -> io::Result<()> {
         cfg.c_showprogress = false;
         cfg.c_legacy_compress = false;
         cfg.c_inline_data = true;
-        cfg.c_ignore_mtime = true;
+        cfg.c_ignore_mtime = fixed_modtime.is_some();
         cfg.c_xattr_name_filter = false;
 
         // force all files to be owned by 'root'
@@ -120,6 +125,7 @@ pub fn erofs_create_from_tarball(
     src_tarball_fd: RawFd,
     dst_erofs_fd: RawFd,
     compression_algo: CompressionAlgo,
+    fixed_modtime: Option<u64>,
 ) -> io::Result<()> {
     debug!("Creating EROFS image from tarball...");
 
@@ -129,7 +135,7 @@ pub fn erofs_create_from_tarball(
         //  struct erofs_sb_info sbi;
 
         // Set initial config
-        erofs_global_config(compression_algo)?;
+        erofs_global_config(compression_algo, fixed_modtime)?;
 
         // This is a cutdown version of the erofs_dev_open() C function, which allows us to
         // write to dst_erofs_fd file descriptor
@@ -320,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_erofs_global_config() {
-        let result = erofs_global_config(CompressionAlgo::Lz4);
+        let result = erofs_global_config(CompressionAlgo::Lz4, None);
         assert!(result.is_ok());
     }
 

@@ -4,7 +4,7 @@ Convert an EntOS widget to RALF package format.
 
 ### Synopsis
 
-Convert a EntOS widget to RALF package format with optional signing.
+Convert an EntOS widget to RALF package format with optional signing.
 
 
 ```
@@ -14,7 +14,7 @@ ralfpack convert [flags] --widget <WIDGET> <RALF_PACKAGE>
 ### Examples
 
 ```
-ralfpack convert --content <path to directory or archive> --config <path to json config file> <RALF_PACKAGE>
+ralfpack convert --widget <path to widget file> <RALF_PACKAGE>
 ```
 
 ### Options
@@ -28,7 +28,8 @@ ralfpack convert --content <path to directory or archive> --config <path to json
                                                    will be `1.2.3-beta1`
       --image-format <IMAGE_FORMAT>                The format to use for the package content image. The tool supports tar with optional compression (gzip or
                                                    zstd) and EROFS images.  By default, the tool will use tar for small packages and EROFS for larger packages.
-                                                   Possible values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4' & 'erofs.zstd'
+                                                   Possible values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4',
+                                                   'erofs.zstd' & 'erofs.nocmpr' (uncompressed)
       --pkcs12 <PKCS12>                            The path to PKCS12 (.p12) file containing the certificate(s) and private key for signing
       --key <KEY>                                  Path to the RSA PEM key file used for signing the package
       --passphrase <PASSPHRASE>                    The passphrase for the key file, if '-' then the passphrase is read from stdin. If no passphrase is provided
@@ -37,7 +38,7 @@ ralfpack convert --content <path to directory or archive> --config <path to json
       --certificate <CERTIFICATE>                  Path to the X.509 certificate in PEM format to include in the OCI Signature
       --certificate-chain <CERTIFICATE_CHAIN>      Path to a PEM file containing one or more X.509 certificates to include in the OCI Signature to build the
                                                    certificate chain for verifying the signing certificate. This optional argument can be specified multiple
-                                                   times to include multiple discrete X.509 certificates. These certificates ate included in the package
+                                                   times to include multiple discrete X.509 certificates. These certificates are included in the package
                                                    signature
       --signature-identity <SIGNATURE_IDENTITY>    Manually set the .critical.docker-reference field in the Signature to the given value. By default, this is
                                                    set to the package id (e.g. com.example.myapp)
@@ -47,6 +48,9 @@ ralfpack convert --content <path to directory or archive> --config <path to json
                                                    this flag is set then the config.xml will be omitted from the package. The config.xml is not required in a
                                                    RALF package, it is provided for backwards compatibility with EntOS apps that expect it to be present at
                                                    runtime
+  -T, --ignore-mtime [<UNIX_TIME>]                 Sets the modification time for all files in the package content image. If specified without a value, uses
+                                                   the current time. If a Unix timestamp is provided, uses that timestamp for all files. If not specified,
+                                                   preserves the original modification times from the widget
   -h, --help                                       Print help
 
 ```
