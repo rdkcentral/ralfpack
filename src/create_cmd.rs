@@ -25,6 +25,7 @@ use crate::utils;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</underline></bold>
 
@@ -220,6 +221,13 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     // Create the object that will populate a temporary file in the format requested with the
     // content
     let mut content_builder = PackageContentBuilder::new(&image_format);
+
+    // If ignore_mtime is set, use the provided timestamp or current time
+    if let Some(mtime_opt) = args.ignore_mtime {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let mtime = mtime_opt.unwrap_or(now);
+        content_builder.set_fixed_modtime(mtime);
+    }
 
     // Limit the max size of the content to 512MB, most devices impose a lower limit than this on
     // packages, so this is just a sanity check

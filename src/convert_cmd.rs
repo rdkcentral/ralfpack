@@ -22,6 +22,7 @@ use crate::package::{PackageBuilder, PackageOutputFormat};
 use crate::package_content::PackageContentFormat;
 use crate::signing_config::{SigningConfig, SigningOptions};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</underline></bold>
 
@@ -139,8 +140,18 @@ pub fn convert_widget(args: ConvertArgs) -> Result<(), String> {
         image_format = args.image_format.unwrap();
     }
 
+    // Check if a fixed timestamp is specified, if so then use that for all files in the package
+    // content image
+    let fixed_modtime = match args.ignore_mtime {
+        None => None,
+        Some(mtime_opt) => {
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            Some(mtime_opt.unwrap_or(now))
+        }
+    };
+
     // Create the package content extracted from the widget
-    let pkg_content = widget.package_content(&image_format, args.remove_configxml)?;
+    let pkg_content = widget.package_content(&image_format, args.remove_configxml, fixed_modtime)?;
 
     // Create the package configuration file from the widget's config.xml and the specified
     // version (or the version extracted from the config.xml if not specified)

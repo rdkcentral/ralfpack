@@ -364,7 +364,6 @@ impl PackageContentBuilder {
     }
 
     /// Sets the modification time for all files and directories in the content.
-    #[allow(dead_code)]
     pub fn set_fixed_modtime(&mut self, mtime: u64) -> &mut Self {
         self.options.mtime = Some(mtime);
         if let Some(erofs_builder) = self.erofs_builder.as_mut() {
@@ -674,7 +673,9 @@ impl PackageContentBuilder {
             let mut mtime = self.default_mtime;
             if let Some(modified_time) = entry.last_modified() {
                 if let Ok(dt) = time::OffsetDateTime::try_from(modified_time) {
-                    mtime = dt.unix_timestamp() as u64;
+                    if let Ok(ts) = u64::try_from(dt.unix_timestamp()) {
+                        mtime = ts;
+                    }
                 }
             }
 
@@ -712,7 +713,7 @@ impl PackageContentBuilder {
                 continue;
             }
 
-            // Get the modification time from the zip entry if available
+            // Get the modification time from the tar entry if available
             let mut mtime = self.default_mtime;
             if let Ok(modified_time) = entry.header().mtime() {
                 mtime = modified_time;
