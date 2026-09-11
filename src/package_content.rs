@@ -21,6 +21,7 @@ use crate::dmverity::dmverity_gen::{DmVerityOptions, dmverity_build_and_append};
 use crate::erofs::erofs_image;
 use crate::erofs::erofs_image::{CompressionAlgo, ErofsImageBuilder};
 use crate::package::PackageBlob;
+use crate::utils;
 use log::debug;
 use oci_spec::image::{MediaType, Sha256Digest};
 use std::collections::HashMap;
@@ -305,8 +306,7 @@ impl PackageContentBuilder {
         };
 
         // By default, for mtime, use the current time in seconds since the UNIX epoch
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-        builder.default_mtime = now.map(|d| d.as_secs()).unwrap_or(0);
+        builder.default_mtime = utils::get_unix_time_now();
 
         // If the format is plain tar file, then can just create a tar writer around the Write
         // object. If format is tar with compression then we also create a tar writer, but around

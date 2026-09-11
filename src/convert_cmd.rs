@@ -21,8 +21,8 @@ use crate::entos;
 use crate::package::{PackageBuilder, PackageOutputFormat};
 use crate::package_content::PackageContentFormat;
 use crate::signing_config::{SigningConfig, SigningOptions};
+use crate::utils;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</underline></bold>
 
@@ -88,7 +88,7 @@ pub struct ConvertArgs {
     /// If a Unix timestamp is provided, uses that timestamp for all files.
     /// If not specified, preserves the original modification times from the widget.
     #[arg(short = 'T', long)]
-    ignore_mtime: Option<Option<u64>>,
+    set_mtime: Option<Option<u64>>,
 
     /// Output package path
     ralf_package: PathBuf,
@@ -142,12 +142,9 @@ pub fn convert_widget(args: ConvertArgs) -> Result<(), String> {
 
     // Check if a fixed timestamp is specified, if so then use that for all files in the package
     // content image
-    let fixed_modtime = match args.ignore_mtime {
+    let fixed_modtime = match args.set_mtime {
         None => None,
-        Some(mtime_opt) => {
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-            Some(mtime_opt.unwrap_or(now))
-        }
+        Some(mtime_opt) => Some(mtime_opt.unwrap_or(utils::get_unix_time_now())),
     };
 
     // Create the package content extracted from the widget

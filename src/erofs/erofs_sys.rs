@@ -26,6 +26,7 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use crate::erofs::erofs_image::CompressionAlgo;
+use crate::utils;
 use libc::c_int;
 use log::*;
 use std::ffi::CString;
@@ -38,12 +39,11 @@ use uuid::Uuid;
 pub fn erofs_global_config(algo: CompressionAlgo, fixed_modtime: Option<u64>) -> io::Result<()> {
     let fs_uuid = Uuid::new_v4();
 
-    let mut fs_time_secs;
+    let fs_time_secs;
     if let Some(mtime) = fixed_modtime {
         fs_time_secs = mtime;
     } else {
-        let fs_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-        fs_time_secs = fs_time.map(|d| d.as_secs()).unwrap_or(0);
+        fs_time_secs = utils::get_unix_time_now();
     }
 
     unsafe {

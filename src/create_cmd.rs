@@ -25,7 +25,6 @@ use crate::utils;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</underline></bold>
 
@@ -70,7 +69,7 @@ pub struct CreateArgs {
     /// If a Unix timestamp is provided, uses that timestamp for all files.
     /// If not specified, preserves the original modification times from the content source.
     #[arg(short = 'T', long)]
-    ignore_mtime: Option<Option<u64>>,
+    set_mtime: Option<Option<u64>>,
 
     /// TODO: Include extra key=value annotations in the package.
     #[arg(long)]
@@ -223,9 +222,8 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     let mut content_builder = PackageContentBuilder::new(&image_format);
 
     // If ignore_mtime is set, use the provided timestamp or current time
-    if let Some(mtime_opt) = args.ignore_mtime {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let mtime = mtime_opt.unwrap_or(now);
+    if let Some(mtime_opt) = args.set_mtime {
+        let mtime = mtime_opt.unwrap_or(utils::get_unix_time_now());
         content_builder.set_fixed_modtime(mtime);
     }
 

@@ -35,7 +35,7 @@ ralfpack create --content <path to directory or archive> --config <path to json 
                                                  and EROFS images.  By default, the tool will use tar for small packages and EROFS for larger packages. Possible
                                                  values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4', 'erofs.zstd' &
                                                  'erofs.nocmpr' (uncompressed)
-  -T, --ignore-mtime [<UNIX_TIME>]               Sets the modification time for all files in the package content image. If specified without a value,
+  -T, --set-mtime [<UNIX_TIME>]                  Sets the modification time for all files in the package content image. If specified without a value,
                                                  uses the current time. If a Unix timestamp is provided, uses that timestamp for all files. If not
                                                  specified, preserves the original modification times from the content source
       --annotations <ANNOTATIONS>                TODO: Include extra key=value annotations in the package

@@ -48,7 +48,7 @@ ralfpack convert --widget <path to widget file> <RALF_PACKAGE>
                                                    this flag is set then the config.xml will be omitted from the package. The config.xml is not required in a
                                                    RALF package, it is provided for backwards compatibility with EntOS apps that expect it to be present at
                                                    runtime
-  -T, --ignore-mtime [<UNIX_TIME>]                 Sets the modification time for all files in the package content image. If specified without a value, uses
+  -T, --set-mtime [<UNIX_TIME>]                    Sets the modification time for all files in the package content image. If specified without a value, uses
                                                    the current time. If a Unix timestamp is provided, uses that timestamp for all files. If not specified,
                                                    preserves the original modification times from the widget
   -h, --help                                       Print help
