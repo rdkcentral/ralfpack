@@ -64,6 +64,13 @@ pub struct CreateArgs {
     #[arg(long)]
     image_format: Option<PackageContentFormat>,
 
+    /// Sets the modification time for all files in the package content image.
+    /// If specified without a value, uses the current time.
+    /// If a Unix timestamp is provided, uses that timestamp for all files.
+    /// If not specified, preserves the original modification times from the content source.
+    #[arg(short = 'T', long)]
+    set_mtime: Option<Option<u64>>,
+
     /// TODO: Include extra key=value annotations in the package.
     #[arg(long)]
     annotations: Option<String>,
@@ -213,6 +220,12 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     // Create the object that will populate a temporary file in the format requested with the
     // content
     let mut content_builder = PackageContentBuilder::new(&image_format);
+
+    // If ignore_mtime is set, use the provided timestamp or current time
+    if let Some(mtime_opt) = args.set_mtime {
+        let mtime = mtime_opt.unwrap_or(utils::get_unix_time_now());
+        content_builder.set_fixed_modtime(mtime);
+    }
 
     // Limit the max size of the content to 512MB, most devices impose a lower limit than this on
     // packages, so this is just a sanity check

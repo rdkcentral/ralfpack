@@ -18,11 +18,11 @@
 //
 
 use serde_json::json;
-use std::time::SystemTime;
 
 use crate::build_info;
 use crate::package::{PackageBlob, PackageBlobString};
 use crate::signing_config::SigningConfig;
+use crate::utils;
 
 pub const MEDIA_TYPE_COSIGN_SIGNATURE: &str = "application/vnd.dev.cosign.simplesigning.v1+json";
 pub const ANNOTATION_COSIGN_SIGNATURE: &str = "dev.cosignproject.cosign/signature";
@@ -66,7 +66,7 @@ impl PackageSignature {
             },
             "optional": {
                 "creator": format!("{} v{}", build_info::PKG_NAME, build_info::PKG_VERSION),
-                "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+                "timestamp": utils::get_unix_time_now(),
             }
         });
 

@@ -21,6 +21,7 @@ use crate::entos;
 use crate::package::{PackageBuilder, PackageOutputFormat};
 use crate::package_content::PackageContentFormat;
 use crate::signing_config::{SigningConfig, SigningOptions};
+use crate::utils;
 use std::path::PathBuf;
 
 pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</underline></bold>
@@ -82,6 +83,13 @@ pub struct ConvertArgs {
     #[arg(long)]
     remove_configxml: bool,
 
+    /// Sets the modification time for all files in the package content image.
+    /// If specified without a value, uses the current time.
+    /// If a Unix timestamp is provided, uses that timestamp for all files.
+    /// If not specified, preserves the original modification times from the widget.
+    #[arg(short = 'T', long)]
+    set_mtime: Option<Option<u64>>,
+
     /// Output package path
     ralf_package: PathBuf,
 }
@@ -132,8 +140,15 @@ pub fn convert_widget(args: ConvertArgs) -> Result<(), String> {
         image_format = args.image_format.unwrap();
     }
 
+    // Check if a fixed timestamp is specified, if so then use that for all files in the package
+    // content image
+    let fixed_modtime = match args.set_mtime {
+        None => None,
+        Some(mtime_opt) => Some(mtime_opt.unwrap_or(utils::get_unix_time_now())),
+    };
+
     // Create the package content extracted from the widget
-    let pkg_content = widget.package_content(&image_format, args.remove_configxml)?;
+    let pkg_content = widget.package_content(&image_format, args.remove_configxml, fixed_modtime)?;
 
     // Create the package configuration file from the widget's config.xml and the specified
     // version (or the version extracted from the config.xml if not specified)
