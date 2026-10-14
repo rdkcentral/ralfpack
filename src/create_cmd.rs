@@ -17,11 +17,12 @@
 // limitations under the License.
 //
 
-use crate::package::{PackageBuilder, PackageOutputFormat};
+use crate::package::{PackageBlob, PackageBuilder, PackageOutputFormat};
 use crate::package_config::PackageConfig;
-use crate::package_content::{PackageContentBuilder, PackageContentFormat};
+use crate::package_content::{PackageContent, PackageContentBuilder, PackageContentFormat};
 use crate::signing_config::{SigningConfig, SigningOptions};
 use crate::utils;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -39,6 +40,9 @@ pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</under
 
   # Create an unsigned RALF package from a config JSON file and content directory formatting content as EROFS image within the package
   ralfpack create --config somecfg.json --content somedir/ --image-format erofs <<RALF_PACKAGE>>
+
+  # Create an unsigned RALF package with an auxiliary content file in the package
+  ralfpack create --config somecfg.json --content somedir/ --auxiliary-content \"application/vnd.foo.package.content.layer.bar+json:./somefile.json\" <<RALF_PACKAGE>>
 
 ");
 
@@ -71,13 +75,13 @@ pub struct CreateArgs {
     #[arg(short = 'T', long)]
     set_mtime: Option<Option<u64>>,
 
-    /// TODO: Include extra key=value annotations in the package.
-    #[arg(long)]
-    annotations: Option<String>,
+    /// Include extra key=value annotations in the package.
+    #[arg(long, value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
+    annotation: Vec<String>,
 
-    /// TODO: Include an auxiliary metadata file in the package.
-    #[arg(long)]
-    auxiliary_content: Option<String>,
+    /// Include an auxiliary metadata file in the package.
+    #[arg(long, value_name = "MEDIA_TYPE:PATH", action = clap::ArgAction::Append)]
+    auxiliary_content: Vec<String>,
 
     /// Hidden option to set the output package format, currently only 'zip' is supported.
     #[arg(long, default_value = "zip", hide = true)]
@@ -151,6 +155,105 @@ fn _desired_content_format<P: AsRef<Path>>(
     }
 }
 
+/// Validates and extracts package annotations from the command line arguments.
+///
+/// Each annotation is expected to be provided as KEY=VALUE. The returned HashMap is suitable for
+/// use when constructing additional package metadata or manifest annotations.
+fn _extract_annotations(args: &CreateArgs) -> Result<HashMap<String, String>, String> {
+    let mut annotations = HashMap::new();
+
+    for annotation in &args.annotation {
+        let Some((key, value)) = annotation.split_once('=') else {
+            return Err(format!("Invalid annotation '{}': expected KEY=VALUE", annotation));
+        };
+
+        let key = key.trim();
+        let value = value.trim();
+
+        if key.is_empty() {
+            return Err(format!("Invalid annotation '{}': key cannot be empty", annotation));
+        }
+
+        // Don't allow annotations that this code automatically sets,
+        // as they will be overwritten and cause confusion
+        if key == oci_spec::image::ANNOTATION_REF_NAME {
+            return Err(format!(
+                "Invalid annotation: key '{}' is reserved and cannot be set manually",
+                key
+            ));
+        }
+
+        if annotations.insert(key.to_string(), value.to_string()).is_some() {
+            return Err(format!("Duplicate annotation key '{}' supplied in --annotation", key));
+        }
+    }
+
+    Ok(annotations)
+}
+
+/// Validates and extracts auxiliary-content arguments from the command line.
+///
+/// Each entry must be in the form `MEDIA_TYPE:PATH`. The path is opened and converted into a
+/// package blob so it can be passed directly to `PackageBuilder::auxiliary_content()`.
+fn _extract_auxiliary_content(args: &CreateArgs) -> Result<Vec<Box<dyn PackageBlob>>, String> {
+    let mut auxiliary_content = Vec::new();
+
+    for entry in &args.auxiliary_content {
+        let Some((media_type, path)) = entry.split_once(':') else {
+            return Err(format!(
+                "Invalid auxiliary content '{}': expected MEDIA_TYPE:PATH",
+                entry
+            ));
+        };
+
+        let media_type = media_type.trim();
+        let path = path.trim();
+        if media_type.is_empty() {
+            return Err(format!(
+                "Invalid auxiliary content '{}': media type cannot be empty",
+                entry
+            ));
+        }
+        if path.is_empty() {
+            return Err(format!("Invalid auxiliary content '{}': path cannot be empty", entry));
+        }
+
+        // Perform a basic RFC 6838-style check before letting OCI types accept the value.
+        let Some((type_part, subtype_part)) = media_type.split_once('/') else {
+            return Err(format!(
+                "Invalid auxiliary content '{}': media type must be of the form type/subtype",
+                entry
+            ));
+        };
+        if type_part.is_empty() || subtype_part.is_empty() {
+            return Err(format!(
+                "Invalid auxiliary content '{}': media type must be of the form type/subtype",
+                entry
+            ));
+        }
+
+        let path = PathBuf::from(path);
+        if !path.exists() {
+            return Err(format!("Auxiliary content file does not exist: {}", path.display()));
+        }
+        if !path.is_file() {
+            return Err(format!("Auxiliary content must be a file: {}", path.display()));
+        }
+
+        let file = File::open(&path)
+            .map_err(|e| format!("Failed to open auxiliary content file {}: {}", path.display(), e))?;
+
+        let media_type = oci_spec::image::MediaType::from(media_type);
+        let blob = PackageContent::new(&media_type, file)
+            .map_err(|e| format!("Failed to read auxiliary content file {}: {}", path.display(), e))?;
+
+        let blob: Box<dyn PackageBlob> = Box::new(blob);
+        auxiliary_content.push(blob);
+    }
+
+    Ok(auxiliary_content)
+}
+
 /// Creates a new signed or unsigned RALF package based on the provided arguments.
 pub fn create_package(args: CreateArgs) -> Result<(), String> {
     // Check that both the config and content paths exist
@@ -160,6 +263,12 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     if !args.content.exists() {
         return Err(format!("The specified content path does not exist: {:?}", args.content));
     }
+
+    // Validate and normalize user-supplied annotations before creating the package.
+    let _annotations = _extract_annotations(&args)?;
+
+    // Validate and load any auxiliary content before creating the package.
+    let pkg_aux_content = _extract_auxiliary_content(&args)?;
 
     // If signing options are provided then create the signing config
     let mut signing_config: Option<SigningConfig> = None;
@@ -283,12 +392,17 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     package_builder = package_builder.config(&pkg_config).content(pkg_content);
 
     // Add any auxiliary content to the package builder
-    // for blob in pkg_aux_content {
-    //    package_builder = package_builder.auxiliary_content(blob);
-    //}
+    for blob in pkg_aux_content {
+        package_builder = package_builder.auxiliary_content(blob);
+    }
 
     // Set the package id as the ref_name, which is then set as an annotation in the package
     package_builder = package_builder.ref_name(parsed_config.id.as_str());
+
+    // Add any other annotations specified by the user to the package builder
+    for (key, value) in _annotations {
+        package_builder = package_builder.annotation(&key, &value);
+    }
 
     // If signing then add the signing config (private key, certs, etc)
     if let Some(mut signing_config) = signing_config {

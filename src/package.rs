@@ -409,8 +409,8 @@ impl PackageContentAndConfig {
     fn new(
         config: String,
         content: PackageContent,
+        annotations: &HashMap<String, String>,
         aux_content: &Vec<Box<dyn PackageBlob>>,
-        ref_name: &Option<String>,
     ) -> PackageContentAndConfig {
         // Wrap the string as a blob
         let mut config_blob = PackageBlobString::new(MediaType::Other(MEDIA_TYPE_PACKAGE_CONFIG.to_string()), config);
@@ -442,9 +442,9 @@ impl PackageContentAndConfig {
         // Convert the manifest JSON to a blob
         let mut manifest_blob = PackageBlobString::new(MediaType::ImageManifest, manifest_str);
 
-        // If a ref_name was supplied then add as an annotation of the manifest
-        if let Some(ref_name) = ref_name {
-            manifest_blob.add_annotation(oci_spec::image::ANNOTATION_REF_NAME, &ref_name);
+        // Add any annotations to the manifest blob (including the ref.name annotation if supplied)
+        for (key, val) in annotations {
+            manifest_blob.add_annotation(&key, &val);
         }
 
         // Store the 3 blobs, the config and data blobs, as well as the JSON blob that stores the
@@ -486,9 +486,6 @@ pub struct PackageBuilder {
     /// The Writer object to write the package content to.  This can be a directory or a tarball.
     output: PackageWriter,
 
-    /// Optional refName for the package.  This is used to set the ref.name annotation
-    ref_name: Option<String>,
-
     /// The signing configuration for the package - if None then the package will not be signed.
     signing_config: Option<SigningConfig>,
 
@@ -497,6 +494,9 @@ pub struct PackageBuilder {
 
     /// The package content.  This is a required field.
     content: Option<PackageContent>,
+
+    /// Any additional annotations to add to the index.json file.
+    annotations: HashMap<String, String>,
 
     /// Any additional auxiliary blobs to add to the package.
     aux_content: Vec<Box<dyn PackageBlob>>,
@@ -529,12 +529,12 @@ impl PackageBuilder {
         // Return a builder writing the contents to the tar file
         PackageBuilder {
             output: PackageWriter::Tar { tar },
-            ref_name: None,
             signing_config: None,
             config: None,
             content: None,
             aux_content: Vec::new(),
             raw_files: HashMap::new(),
+            annotations: HashMap::new(),
         }
     }
 
@@ -550,12 +550,12 @@ impl PackageBuilder {
         // Return a builder writing the contents to the tar file
         PackageBuilder {
             output: PackageWriter::Zip { zip },
-            ref_name: None,
             signing_config: None,
             config: None,
             content: None,
             aux_content: Vec::new(),
             raw_files: HashMap::new(),
+            annotations: HashMap::new(),
         }
     }
 
@@ -570,12 +570,12 @@ impl PackageBuilder {
         // Return a builder writing the contents to the tar file
         PackageBuilder {
             output: PackageWriter::Zip { zip },
-            ref_name: None,
             signing_config: None,
             config: None,
             content: None,
             aux_content: Vec::new(),
             raw_files: HashMap::new(),
+            annotations: HashMap::new(),
         }
     }
 
@@ -612,7 +612,8 @@ impl PackageBuilder {
     /// the manifest descriptor.  Typically, this is the "<appId>:<version>" of the package.
     #[allow(unused)]
     pub fn ref_name(mut self, ref_name: &str) -> PackageBuilder {
-        self.ref_name = Some(ref_name.to_string());
+        self.annotations
+            .insert(oci_spec::image::ANNOTATION_REF_NAME.to_string(), ref_name.to_string());
         self
     }
 
@@ -635,6 +636,13 @@ impl PackageBuilder {
     /// and the SHA256 hash of the blob is written to the package descriptor.
     pub fn content(mut self, content: PackageContent) -> PackageBuilder {
         self.content = Some(content);
+        self
+    }
+
+    /// Adds additional annotations to the package index descriptor.  These annotations are added
+    /// to the index.json file.
+    pub fn annotation(mut self, key: &str, value: &str) -> PackageBuilder {
+        self.annotations.insert(key.to_string(), value.to_string());
         self
     }
 
@@ -671,7 +679,8 @@ impl PackageBuilder {
         let config = self.config.take().unwrap();
 
         // Wrap the config and content in a PackageContentAndConfig object
-        let mut content_and_config = PackageContentAndConfig::new(config, content, &self.aux_content, &self.ref_name);
+        let mut content_and_config =
+            PackageContentAndConfig::new(config, content, &self.annotations, &self.aux_content);
 
         // Create the image manifest for the content and config
         let content_and_config_desc = content_and_config.manifest_descriptor();

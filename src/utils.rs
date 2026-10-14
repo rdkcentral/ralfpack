@@ -19,7 +19,6 @@
 
 use log::warn;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 /// Helper function to get the decompressed size of a zip archive.
