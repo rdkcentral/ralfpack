@@ -89,8 +89,13 @@ impl Widget {
         &self,
         format: &PackageContentFormat,
         exclude_configxml: bool,
+        fixed_modtime: Option<u64>,
     ) -> Result<PackageContent, String> {
         let mut content_builder = PackageContentBuilder::new(format);
+
+        if let Some(mtime) = fixed_modtime {
+            content_builder.set_fixed_modtime(mtime);
+        }
 
         if exclude_configxml {
             log::debug!("Excluding config.xml from package content as requested");

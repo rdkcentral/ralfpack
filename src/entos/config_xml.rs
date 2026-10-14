@@ -99,6 +99,7 @@ impl From<&ConfigXml> for PackageConfig {
             version_name: Some(config_xml.name.version.clone()),
             name: config_xml.name.long.clone(),
             entry_point: config_xml.content.src.clone(),
+            entry_args: None,
             package_type: config_xml.get_package_type().to_string(),
             package_specifier: Some(config_xml.get_package_specifier().to_string()),
             dependencies: config_xml.get_package_dependencies(),

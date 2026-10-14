@@ -39,6 +39,13 @@
       "type": "string",
       "minLength": 1
     },
+    "entryArgs": {
+      "description": "Optional arguments passed to the entryPoint executable or script when launching the package.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "dependencies": {
       "description": "Dependencies are specified with a package name to version range. The version range is a string which has one or more space-separated descriptors. Dependencies can also be identified with a tarball, digest, tag or git URL.",
       "type": "object",

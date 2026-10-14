@@ -19,6 +19,7 @@
 
 use log::warn;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 /// Helper function to get the decompressed size of a zip archive.
@@ -74,5 +75,16 @@ pub fn archive_extracted_size<P: AsRef<Path>>(path: P) -> io::Result<u64> {
         Ok(size as u64)
     } else {
         return Err(io::Error::new(io::ErrorKind::Other, "Unknown archive format"));
+    }
+}
+
+/// Returns the current unix epoch time as u64.
+///
+/// In the unlikely event of internal failure, this function returns 0.
+///
+pub fn get_unix_time_now() -> u64 {
+    match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs(),
+        Err(_) => 0,
     }
 }

@@ -368,6 +368,9 @@ pub struct PackageConfig {
 
     pub entry_point: String,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_args: Option<Vec<String>>,
+
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub dependencies: HashMap<String, String>,
 
@@ -474,6 +477,12 @@ mod tests {
         assert_eq!(config.id, "com.sky.myapp");
         assert_eq!(config.version, "1.2.3");
         assert_eq!(config.version_name.unwrap(), "1.2.3-beta");
+
+        assert_eq!(config.entry_point, "web/index.html".to_string());
+        assert_eq!(
+            config.entry_args,
+            Some(vec!["--enable-feature-x".to_string(), "--set-mode=dark".to_string()])
+        );
     }
 
     #[test]
@@ -486,6 +495,7 @@ mod tests {
             package_type: "application".to_string(),
             package_specifier: Some("html".to_string()),
             entry_point: "web/index.html".to_string(),
+            entry_args: Some(vec!["--arg1".to_string(), "--arg2".to_string()]),
             dependencies: HashMap::new(),
             permissions: HashSet::new(),
             configuration: Configuration {

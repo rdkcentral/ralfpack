@@ -49,24 +49,20 @@ pub struct ErofsImageBuilder {
 #[derive(Clone, Copy)]
 struct ErofsImageBuilderOptions {
     compression: CompressionAlgo,
-    mtime: u64,
+    fixed_modtime: Option<u64>,
 }
 
 impl ErofsImageBuilder {
     /// Creates the default EROFS image builder, this sets the default compression algorithm and
     /// other configuration.
     pub fn new() -> ErofsImageBuilder {
-        // By default, for mtime, use the current time in seconds since the UNIX epoch
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-        let mtime = now.map(|d| d.as_secs()).unwrap_or(0);
-
         // Create a temporary file for creating the intermediate tar archive
         let temp_file = tempfile().expect("Failed to create temporary file for EROFS image generation");
 
         ErofsImageBuilder {
             options: ErofsImageBuilderOptions {
                 compression: CompressionAlgo::Lz4,
-                mtime: mtime,
+                fixed_modtime: None,
             },
             tar_builder: Some(tar::Builder::new(temp_file)),
         }
@@ -77,20 +73,27 @@ impl ErofsImageBuilder {
         self.options.compression = algo;
     }
 
-    /// Sets the modification time for all files and directories in the EROFS image.
-    #[allow(dead_code)]
-    pub fn modtime(&mut self, mtime: u64) {
-        self.options.mtime = mtime;
+    /// Sets a fixed modification time for all files and directories in the EROFS image.
+    /// By default, the mtime of the source files / dirs is preserved.
+    pub fn fixed_modtime(&mut self, mtime: u64) {
+        self.options.fixed_modtime = Some(mtime);
     }
 
     /// Appends a file to the EROFS image with the given path, mode and data.
     ///
     /// This just adds the file to the tar archive, the actual EROFS image is built when the
     /// `build` method is called.
-    pub fn append_data<P: AsRef<Path>, R: Read>(&mut self, path: P, data: R, size: usize, mode: u32) -> io::Result<()> {
+    pub fn append_data<P: AsRef<Path>, R: Read>(
+        &mut self,
+        path: P,
+        data: R,
+        size: usize,
+        mode: u32,
+        mtime: u64,
+    ) -> io::Result<()> {
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Regular);
-        header.set_mtime(self.options.mtime);
+        header.set_mtime(mtime);
         header.set_mode(mode);
         header.set_size(size as u64);
         header.set_uid(0);
@@ -108,10 +111,10 @@ impl ErofsImageBuilder {
     ///
     /// This just adds the symlink to the tar archive, the actual EROFS image is built when the
     /// `build` method is called.
-    pub fn append_link<P: AsRef<Path>, T: AsRef<Path>>(&mut self, path: P, target: T) -> io::Result<()> {
+    pub fn append_link<P: AsRef<Path>, T: AsRef<Path>>(&mut self, path: P, target: T, mtime: u64) -> io::Result<()> {
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Symlink);
-        header.set_mtime(self.options.mtime);
+        header.set_mtime(mtime);
         header.set_mode(0o777);
         header.set_uid(0);
         header.set_gid(0);
@@ -128,10 +131,10 @@ impl ErofsImageBuilder {
     ///
     /// This just adds the directory to the tar archive, the actual EROFS image is built when the
     /// `build` method is called.
-    pub fn append_dir<P: AsRef<Path>>(&mut self, path: P, mode: u32) -> io::Result<()> {
+    pub fn append_dir<P: AsRef<Path>>(&mut self, path: P, mode: u32, mtime: u64) -> io::Result<()> {
         let mut header = tar::Header::new_gnu();
         header.set_entry_type(tar::EntryType::Directory);
-        header.set_mtime(self.options.mtime);
+        header.set_mtime(mtime);
         header.set_mode(mode);
         header.set_size(0);
         header.set_uid(0);
@@ -175,7 +178,7 @@ impl ErofsImageBuilder {
         let img_fd = output.as_raw_fd();
 
         // Build the EROFS image from the tar archive
-        erofs_create_from_tarball(tar_fd, img_fd, self.options.compression)?;
+        erofs_create_from_tarball(tar_fd, img_fd, self.options.compression, self.options.fixed_modtime)?;
 
         // Flush and rewind the output file
         output.flush()?;
