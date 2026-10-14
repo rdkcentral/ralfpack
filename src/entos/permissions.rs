@@ -72,3 +72,6 @@ pub const ENTOS_ENTITLEMENT_INFO_PERMISSION: &str = "urn:entos:permission:entitl
 /// Legacy permission used to denote special behaviour if the app was launched.
 /// This is no longer used, but kept for backwards compatibility.
 pub const ENTOS_MEMORY_INTENSIVE_PERMISSION: &str = "urn:entos:permission:memory-intensive";
+
+/// Enable container access to ICrypto service running on the device.
+pub const ENTOS_ICRYPTO_PERMISSION: &str = "urn:entos:permission:icrypto";

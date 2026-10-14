@@ -470,6 +470,9 @@ impl Capabilities {
                 "https-mutual-authentication" => {
                     permission_set.insert(entos::permissions::ENTOS_HTTPS_MTLS_AUTHENTICATION_PERMISSION.to_owned());
                 }
+                "icrypto" => {
+                    permission_set.insert(entos::permissions::ENTOS_ICRYPTO_PERMISSION.to_owned());
+                }
                 _ => {}
             }
         }
@@ -924,6 +927,7 @@ fn get_capabilities(pkg_config: &PackageConfig) -> Capabilities {
         entos::permissions::ENTOS_MEMORY_INTENSIVE_PERMISSION,
         "memory-intensive",
     );
+    pmap.insert(entos::permissions::ENTOS_ICRYPTO_PERMISSION, "icrypto");
 
     // Add the easy one to one mapping of permissions to capabilities
     for permission in &pkg_config.permissions {
