@@ -76,11 +76,15 @@ pub struct CreateArgs {
     #[arg(short = 'T', long)]
     set_mtime: Option<Option<u64>>,
 
-    /// Include extra key=value annotations in the package.
+    /// Include extra key=value annotations in the package.  These are added to the manifest
+    /// and therefore covered by any signing of the package.  This option can be specified multiple
+    /// times to add multiple annotations.
     #[arg(long, value_name = "KEY=VALUE", action = clap::ArgAction::Append)]
     annotation: Vec<String>,
 
-    /// Include an auxiliary metadata file in the package.
+    /// Include an auxiliary metadata file in the package.  This option can be specified multiple
+    /// times to add multiple auxiliary content files.  Auxiliary content is added as a layer
+    /// in the package and is covered by any signing of the package.
     #[arg(long, value_name = "MEDIA_TYPE:PATH", action = clap::ArgAction::Append)]
     auxiliary_content: Vec<String>,
 
@@ -277,7 +281,7 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     }
 
     // Validate and normalize user-supplied annotations before creating the package.
-    let _annotations = _extract_annotations(&args)?;
+    let annotations = _extract_annotations(&args)?;
 
     // Validate and load any auxiliary content before creating the package.
     let pkg_aux_content = _extract_auxiliary_content(&args)?;
@@ -412,7 +416,7 @@ pub fn create_package(args: CreateArgs) -> Result<(), String> {
     package_builder = package_builder.ref_name(parsed_config.id.as_str());
 
     // Add any other annotations specified by the user to the package builder
-    for (key, value) in _annotations {
+    for (key, value) in annotations {
         package_builder = package_builder.annotation(&key, &value);
     }
 
