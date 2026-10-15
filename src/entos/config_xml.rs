@@ -95,10 +95,11 @@ impl From<&ConfigXml> for PackageConfig {
     fn from(config_xml: &ConfigXml) -> Self {
         let pkg_config = PackageConfig {
             id: config_xml.name.short.clone(),
+            spec_version: "1.1.0".to_string(),
             version: config_xml.get_package_version(),
             version_name: Some(config_xml.name.version.clone()),
             name: config_xml.name.long.clone(),
-            entry_point: config_xml.content.src.clone(),
+            entry_point: Some(config_xml.content.src.clone()),
             entry_args: None,
             package_type: config_xml.get_package_type().to_string(),
             package_specifier: Some(config_xml.get_package_specifier().to_string()),
@@ -778,7 +779,7 @@ impl From<&PackageConfig> for ConfigXml {
             },
             icon: get_icon_config(&pkg_config.configuration),
             content: Content {
-                src: pkg_config.entry_point.clone(),
+                src: pkg_config.entry_point.clone().unwrap_or("".to_string()),
                 content_type: get_content_type(&pkg_config),
                 platform: None,
                 platform_filters: get_platform_filters(&pkg_config.configuration),
@@ -1127,7 +1128,7 @@ mod tests {
         assert_eq!(config_json.version, "1.2.3");
         assert_eq!(config_json.version_name, Some("1.2.3-beta".to_string()));
         assert_eq!(config_json.name, Some("ExampleApp".to_string()));
-        assert_eq!(config_json.entry_point, "run-me.bin");
+        assert_eq!(config_json.entry_point.unwrap(), "run-me.bin");
         assert_eq!(config_json.package_type, "application");
         assert_eq!(config_json.package_specifier, Some("system".to_string()));
         //assert_eq!(
