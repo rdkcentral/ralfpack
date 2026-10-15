@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use crate::package_reader::RalfPackage;
 
 pub const EXAMPLES: &str = color_print::cstr!("<bold><underline>Examples:</underline></bold>
 
@@ -244,6 +245,17 @@ fn _extract_auxiliary_content(args: &CreateArgs) -> Result<Vec<Box<dyn PackageBl
             .map_err(|e| format!("Failed to open auxiliary content file {}: {}", path.display(), e))?;
 
         let media_type = oci_spec::image::MediaType::from(media_type);
+
+        // Check the media type is not one of the reserved types, we shouldn't allow the user
+        // to use this to add new content that will be treated as the config or content layers
+        // of the package.
+        if RalfPackage::is_package_content_media_type(&media_type) {
+            return Err(format!(
+                "Invalid auxiliary content '{}': media type '{}' is reserved and cannot be used for auxiliary content",
+                entry, media_type
+            ));
+        }
+
         let blob = PackageContent::new(&media_type, file)
             .map_err(|e| format!("Failed to read auxiliary content file {}: {}", path.display(), e))?;
 
