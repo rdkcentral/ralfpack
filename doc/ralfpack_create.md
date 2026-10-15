@@ -38,8 +38,11 @@ ralfpack create --content <path to directory or archive> --config <path to json 
   -T, --set-mtime [<UNIX_TIME>]                  Sets the modification time for all files in the package content image. If specified without a value,
                                                  uses the current time. If a Unix timestamp is provided, uses that timestamp for all files. If not
                                                  specified, preserves the original modification times from the content source
-      --annotations <ANNOTATIONS>                TODO: Include extra key=value annotations in the package
-      --auxiliary-content <AUXILIARY_CONTENT>    TODO: Include an auxiliary metadata file in the package
+      --annotation <KEY=VALUE>                   Include extra key=value annotations in the package.  These are added to the manifest and therefore covered by
+                                                 any signing of the package.  This option can be specified multiple times to add multiple annotations
+      --auxiliary-content <MEDIA_TYPE:PATH>      Include an auxiliary metadata file in the package.  This option can be specified multiple times to add multiple
+                                                 auxiliary content files.  Auxiliary content is added as a layer in the package and is covered by any signing of
+                                                 the package
       --pkcs12 <PKCS12>                          The path to PKCS12 (.p12) file containing the certificate(s) and private key for signing
       --key <KEY>                                Path to the RSA PEM key file used for signing the package
       --passphrase <PASSPHRASE>                  The passphrase for the key file, if '-' then the passphrase is read from stdin. If no passphrase is provided

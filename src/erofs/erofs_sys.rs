@@ -33,7 +33,6 @@ use std::ffi::CString;
 use std::io;
 use std::os::fd::RawFd;
 use std::os::raw::c_void;
-use std::time::SystemTime;
 use uuid::Uuid;
 
 pub fn erofs_global_config(algo: CompressionAlgo, fixed_modtime: Option<u64>) -> io::Result<()> {

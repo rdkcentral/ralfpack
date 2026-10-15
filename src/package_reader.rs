@@ -444,7 +444,7 @@ impl RalfPackage {
     }
 
     /// Returns true if the media type is one of the supported package content types
-    fn is_package_content_media_type(media_type: &oci_spec::image::MediaType) -> bool {
+    pub fn is_package_content_media_type(media_type: &oci_spec::image::MediaType) -> bool {
         match media_type {
             oci_spec::image::MediaType::Other(s) => match s.as_str() {
                 MEDIA_TYPE_PACKAGE_CONTENT_TAR

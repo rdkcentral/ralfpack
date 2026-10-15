@@ -409,8 +409,9 @@ impl PackageContentAndConfig {
     fn new(
         config: String,
         content: PackageContent,
-        aux_content: &Vec<Box<dyn PackageBlob>>,
         ref_name: &Option<String>,
+        annotations: &HashMap<String, String>,
+        aux_content: &Vec<Box<dyn PackageBlob>>,
     ) -> PackageContentAndConfig {
         // Wrap the string as a blob
         let mut config_blob = PackageBlobString::new(MediaType::Other(MEDIA_TYPE_PACKAGE_CONFIG.to_string()), config);
@@ -431,6 +432,7 @@ impl PackageContentAndConfig {
             .artifact_type(MediaType::Other(MEDIA_TYPE_PACKAGE_ARTIFACT_TYPE.to_string()))
             .config(config_blob.descriptor())
             .layers(layers)
+            .annotations(annotations.clone())
             .build()
             .expect("Failed to create image manifest");
 
@@ -442,7 +444,7 @@ impl PackageContentAndConfig {
         // Convert the manifest JSON to a blob
         let mut manifest_blob = PackageBlobString::new(MediaType::ImageManifest, manifest_str);
 
-        // If a ref_name was supplied then add as an annotation of the manifest
+        // If a ref_name was supplied then add as an descriptor annotation of the manifest
         if let Some(ref_name) = ref_name {
             manifest_blob.add_annotation(oci_spec::image::ANNOTATION_REF_NAME, &ref_name);
         }
@@ -498,6 +500,9 @@ pub struct PackageBuilder {
     /// The package content.  This is a required field.
     content: Option<PackageContent>,
 
+    /// Any additional annotations to add to the package config+content manifest.
+    annotations: HashMap<String, String>,
+
     /// Any additional auxiliary blobs to add to the package.
     aux_content: Vec<Box<dyn PackageBlob>>,
 
@@ -535,6 +540,7 @@ impl PackageBuilder {
             content: None,
             aux_content: Vec::new(),
             raw_files: HashMap::new(),
+            annotations: HashMap::new(),
         }
     }
 
@@ -556,6 +562,7 @@ impl PackageBuilder {
             content: None,
             aux_content: Vec::new(),
             raw_files: HashMap::new(),
+            annotations: HashMap::new(),
         }
     }
 
@@ -576,6 +583,7 @@ impl PackageBuilder {
             content: None,
             aux_content: Vec::new(),
             raw_files: HashMap::new(),
+            annotations: HashMap::new(),
         }
     }
 
@@ -610,7 +618,6 @@ impl PackageBuilder {
 
     /// Sets the optional refname for the package. This is used to set the ref.name annotation in
     /// the manifest descriptor.  Typically, this is the "<appId>:<version>" of the package.
-    #[allow(unused)]
     pub fn ref_name(mut self, ref_name: &str) -> PackageBuilder {
         self.ref_name = Some(ref_name.to_string());
         self
@@ -635,6 +642,13 @@ impl PackageBuilder {
     /// and the SHA256 hash of the blob is written to the package descriptor.
     pub fn content(mut self, content: PackageContent) -> PackageBuilder {
         self.content = Some(content);
+        self
+    }
+
+    /// Adds additional annotations to the package index descriptor.  These annotations are added
+    /// to the image manifest blob that contains the config and content descriptors.
+    pub fn annotation(mut self, key: &str, value: &str) -> PackageBuilder {
+        self.annotations.insert(key.to_string(), value.to_string());
         self
     }
 
@@ -671,7 +685,8 @@ impl PackageBuilder {
         let config = self.config.take().unwrap();
 
         // Wrap the config and content in a PackageContentAndConfig object
-        let mut content_and_config = PackageContentAndConfig::new(config, content, &self.aux_content, &self.ref_name);
+        let mut content_and_config =
+            PackageContentAndConfig::new(config, content, &self.ref_name, &self.annotations, &self.aux_content);
 
         // Create the image manifest for the content and config
         let content_and_config_desc = content_and_config.manifest_descriptor();

@@ -21,7 +21,6 @@ use crate::erofs::erofs_sys::erofs_create_from_tarball;
 use std::io::{Read, Seek, Write};
 use std::os::fd::AsRawFd;
 use std::path::Path;
-use std::time::SystemTime;
 use std::{fs, io};
 use tempfile::tempfile;
 
