@@ -646,7 +646,7 @@ impl PackageBuilder {
     }
 
     /// Adds additional annotations to the package index descriptor.  These annotations are added
-    /// to the index.json file.
+    /// to the image manifest blob that contains the config and content descriptors.
     pub fn annotation(mut self, key: &str, value: &str) -> PackageBuilder {
         self.annotations.insert(key.to_string(), value.to_string());
         self
