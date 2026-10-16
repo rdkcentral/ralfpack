@@ -28,7 +28,7 @@ ralfpack convert --widget <path to widget file> <RALF_PACKAGE>
                                                    will be `1.2.3-beta1`
       --image-format <IMAGE_FORMAT>                The format to use for the package content image. The tool supports tar with optional compression (gzip or
                                                    zstd) and EROFS images.  By default, the tool will use tar for small packages and EROFS for larger packages.
-                                                   Possible values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4',
+                                                   Possible values are: 'tar', 'tar.gz', 'tar.zstd', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4',
                                                    'erofs.zstd' & 'erofs.nocmpr' (uncompressed)
       --pkcs12 <PKCS12>                            The path to PKCS12 (.p12) file containing the certificate(s) and private key for signing
       --key <KEY>                                  Path to the RSA PEM key file used for signing the package

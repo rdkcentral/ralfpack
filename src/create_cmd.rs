@@ -64,7 +64,7 @@ pub struct CreateArgs {
     /// The format to use for the package content image. The tool supports tar with optional
     /// compression (gzip or zstd) and EROFS images.  By default, the tool will use tar for small
     /// packages and EROFS for larger packages.
-    /// Possible values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4',
+    /// Possible values are: 'tar', 'tar.gz', 'tar.zstd', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4',
     /// 'erofs.zstd' & 'erofs.nocmpr' (uncompressed).
     #[arg(long)]
     image_format: Option<PackageContentFormat>,
@@ -107,7 +107,7 @@ pub struct CreateArgs {
 /// packages to be directly mounted and used, while smaller packages can be tarballs that are
 /// quickly extracted to RAM and used.
 ///
-/// Also, if the package format is already compressed (zip or tar.gz/tar.zst) then the content
+/// Also, if the package format is already compressed (zip or tar.gz/tar.zstd) then the content
 /// format should not be compressed.
 ///
 fn _desired_content_format<P: AsRef<Path>>(

@@ -7,7 +7,7 @@ Creates and optionally signs a new package from image content and configuration 
 Given a directory or an archive with app image content, and a configuration file, creates a new package file.
 If signing options are provided, the package will be signed during creation.
 
-The content can be provided as a directory or an archive file (tar, tar.gz, tar.zst, or zip).
+The content can be provided as a directory or an archive file (tar, tar.gz, tar.zstd, or zip).
 
 The config file must be a JSON file that conforms to the RALF package configuration schema.
 
@@ -33,7 +33,7 @@ ralfpack create --content <path to directory or archive> --config <path to json 
       --no-schema-check                          Disables the JSON schema check on the configuration file
       --image-format <IMAGE_FORMAT>              The format to use for the package content image. The tool supports tar with optional compression (gzip or zstd)
                                                  and EROFS images.  By default, the tool will use tar for small packages and EROFS for larger packages. Possible
-                                                 values are: 'tar', 'tar.gz', 'tar.zst', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4', 'erofs.zstd' &
+                                                 values are: 'tar', 'tar.gz', 'tar.zstd', 'erofs' (alias for 'erofs.lz4'), 'erofs.lz4', 'erofs.zstd' &
                                                  'erofs.nocmpr' (uncompressed)
   -T, --set-mtime [<UNIX_TIME>]                  Sets the modification time for all files in the package content image. If specified without a value,
                                                  uses the current time. If a Unix timestamp is provided, uses that timestamp for all files. If not

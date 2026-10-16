@@ -72,6 +72,19 @@ Before RDK accepts your code into the project you must sign the RDK Contributor 
 - Add or update tests for new features and bug fixes.
 - Run `cargo test` before submitting.
 - For integration with C code, ensure relevant scripts and build steps are tested.
+- `cargo test --bins` runs the unit tests.
+
+### Integration tests
+The tests in `tests/` run the built `ralfpack` binary to create signed and unsigned packages and verify them with
+`unwgt` from [ralf-utils](https://github.com/rdkcentral/ralf-utils).  Build `unwgt` (see the ralf-utils README),
+then point the tests at it:
+```sh
+UNWGT=/path/to/unwgt cargo test --test packages
+# or, if unwgt is in a directory (or on PATH)
+RALF_UTILS_DIR=/path/to/dir cargo test --test packages
+```
+`RALFPACK_BIN` can override the `ralfpack` binary under test.  If `unwgt` is not found the tests are skipped,
+unless the `CI` environment variable is set, in which case they fail.
 
 ## Contact
 For questions, reach out via GitHub issues or email the maintainers listed in `Cargo.toml`.
