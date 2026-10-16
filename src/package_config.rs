@@ -131,8 +131,8 @@ impl Display for PackageSpecifier {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationLifecycleConfiguration {
-    /// Optional supported non-active lifecycle states for the application
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    /// Supported non-active lifecycle states for the application
+    #[serde(default)]
     pub supported_non_active_states: Vec<LifecycleState>,
 
     /// The optional maximum system memory allowed for the app when suspended.
