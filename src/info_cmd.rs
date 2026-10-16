@@ -294,7 +294,7 @@ fn display_package_summary(ralf_package: Option<PathBuf>) -> Result<(), String> 
     }
 
     println!("config:");
-    println!("  entrypoint: {}", config.entry_point);
+    println!("  entrypoint: {:?}", config.entry_point);
     println!("  dependencies:");
     if config.dependencies.is_empty() {
         println!("    - None");

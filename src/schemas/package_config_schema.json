@@ -1,6 +1,6 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema#",
-  "$id": "https://github.com/rdkcentral/oci-package-spec/blob/main/schema/package.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rdkcentral/oci-package-spec/main/schema/v1/package.schema.json",
   "title": "Package Metadata Schema",
   "description": "Schema defines a JSON structure that accurately represents the package metadata for use with OCI Packaging Format.",
   "type": "object",
@@ -9,6 +9,11 @@
       "description": "The id field is a unique identifier of the package. Typically, this is represented in a reverse domain notation.",
       "type": "string",
       "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
+    },
+    "specVersion": {
+      "description": "The version of the RALF specification this package adheres to. Semantic Versioning (MAJOR.MINOR.PATCH) with optional pre-release tag.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
     },
     "version": {
       "description": "The semantic version number of the package, this is strictly checked to ensure it contains numbers separated by periods",
@@ -65,9 +70,300 @@
     "configuration": {
       "description": "Package specific configuration.",
       "type": "object",
+      "properties": {
+        "urn:rdk:config:env": {
+          "description": "Environment variables (NAME → value) to inject into the application container.",
+          "type": "object",
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]*$": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "urn:rdk:config:runtime": {
+          "description": "Runtime capability descriptor advertising the application types this runtime supports. REQUIRED for runtime packages.",
+          "type": "object",
+          "properties": {
+            "supportedApplicationTypes": {
+              "description": "The application types this runtime can host.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "description": "Application type identifier this runtime supports.",
+                    "type": "string"
+                  },
+                  "args": {
+                    "description": "Arguments passed to the runtime for this application type.",
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            }
+          },
+          "required": [
+            "supportedApplicationTypes"
+          ]
+        },
+        "urn:rdk:config:overrides": {
+          "description": "Configuration overrides for dependencies.",
+          "type": "object",
+          "properties": {
+            "application": {
+              "description": "An undefined JSON blob that allows to override config values used by the application.",
+              "type": "object",
+              "additionalProperties": true
+            },
+            "runtime": {
+              "description": "An undefined JSON blob that allows to override config values used by the runtime.",
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "urn:rdk:config:log-levels": {
+          "description": "Logging levels.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "default",
+              "fatal",
+              "error",
+              "warning",
+              "milestone",
+              "info",
+              "debug"
+            ]
+          }
+        },
+        "urn:rdk:config:dial": {
+          "description": "DIAL service details.",
+          "type": "object",
+          "properties": {
+            "appNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "corsDomains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "originHeaderRequired": {
+              "type": "boolean"
+            }
+          }
+        },
+        "urn:rdk:config:application-lifecycle": {
+          "description": "Set of the supported lifecycle parameters for the app or service.",
+          "type": "object",
+          "properties": {
+            "supportedNonActiveStates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of supported non-active lifecycle states."
+            },
+            "maxSuspendedSystemMemory": {
+              "type": "string",
+              "pattern": "^\\d+[GMKBgmkb]?$"
+            },
+            "maxTimeToSuspendMemoryState": {
+              "type": "number"
+            },
+            "startupTimeout": {
+              "type": "number"
+            },
+            "watchdogInterval": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "supportedNonActiveStates"
+          ],
+          "additionalProperties": false
+        },
+        "urn:rdk:config:platform": {
+          "description": "Specifies the platform on which the package is intended to run.",
+          "type": "object",
+          "properties": {
+            "architecture": {
+              "description": "The CPU architecture of the platform. Examples: 'amd64', 'arm', 'ppc64le'.",
+              "type": "string"
+            },
+            "variant": {
+              "description": "The CPU architecture variant. This field is OPTIONAL. Examples: 'v7' for ARM, 'z' for s390x.",
+              "type": "string"
+            },
+            "os": {
+              "description": "The operating system of the platform. Examples: 'linux', 'windows', 'darwin'.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "architecture",
+            "os"
+          ]
+        },
+        "urn:rdk:config:input-handling": {
+          "description": "Input handling configuration.",
+          "type": "object",
+          "properties": {
+            "keyIntercept": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "keyCapture": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "keyMonitor": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "urn:rdk:config:window": {
+          "description": "Window configuration for the app.",
+          "type": "object",
+          "properties": {
+            "virtualDisplaySize": {
+              "type": "integer"
+            }
+          }
+        },
+        "urn:rdk:config:network": {
+          "description": "Network services configuration.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "port",
+              "protocol",
+              "type"
+            ]
+          }
+        },
+        "urn:rdk:config:memory": {
+          "description": "Memory quota. Value can be specified with a G, M, K or B suffix (case-insensitive). If no suffix is provided, the value is assumed to be in bytes.",
+          "type": "object",
+          "properties": {
+            "system": {
+              "type": "string",
+              "pattern": "^\\d+[GMKBgmkb]?$"
+            },
+            "gpu": {
+              "type": "string",
+              "pattern": "^\\d+[GMKBgmkb]?$"
+            }
+          },
+          "required": [
+            "system"
+          ]
+        },
+        "urn:rdk:config:storage": {
+          "description": "Storage quota. Value can be specified with a G, M, K or B suffix (case-insensitive). If no suffix is provided, the value is assumed to be in bytes.",
+          "type": "object",
+          "properties": {
+            "maxLocalStorage": {
+              "type": "string",
+              "pattern": "^\\d+[GMKBgmkb]?$"
+            },
+            "sharedStorageAppId": {
+              "type": "string",
+              "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
+            }
+          },
+          "anyOf": [
+            { "required": ["maxLocalStorage"] },
+            { "required": ["sharedStorageAppId"] }
+          ]
+        }
+      },
       "additionalProperties": true
     }
   },
-  "required": ["id", "version", "packageType", "entryPoint"],
-  "additionalProperties": false
+  "required": [
+    "id",
+    "specVersion",
+    "version",
+    "packageType"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "packageType": {
+            "const": "runtime"
+          }
+        },
+        "required": [
+          "packageType"
+        ]
+      },
+      "then": {
+        "properties": {
+          "configuration": {
+            "type": "object",
+            "required": [
+              "urn:rdk:config:runtime"
+            ]
+          }
+        },
+        "required": [
+          "configuration"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "packageType": {
+            "const": "resource"
+          }
+        },
+        "required": [
+          "packageType"
+        ]
+      },
+      "else": {
+        "required": [
+          "entryPoint"
+        ]
+      }
+    }
+  ]
 }

@@ -78,7 +78,7 @@ pub(crate) mod permissions {
     pub const COMPOSITOR_PERMISSION: &str = "urn:rdk:permission:compositor";
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum PackageType {
     Base,
@@ -131,8 +131,8 @@ impl Display for PackageSpecifier {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationLifecycleConfiguration {
-    /// Optional supported non-active lifecycle states for the application
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    /// Supported non-active lifecycle states for the application
+    #[serde(default)]
     pub supported_non_active_states: Vec<LifecycleState>,
 
     /// The optional maximum system memory allowed for the app when suspended.
@@ -263,7 +263,25 @@ pub struct WindowConfiguration {
     pub virtual_display_size: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportedApplicationType {
+    /// The application type that is supported by the runtime.
+    #[serde(rename = "type")]
+    pub application_type: String,
+
+    // There is also an "args" optional field in the schema, but it's not used on EntOS
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeConfiguration {
+    /// The list of supported application types for the runtime.  This can be used to
+    /// determine which runtimes can be used to run which applications.
+    pub supported_application_types: Vec<SupportedApplicationType>
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Platform {
     pub architecture: String,
@@ -315,6 +333,9 @@ pub struct Configuration {
     #[serde(rename = "urn:rdk:config:window", skip_serializing_if = "Option::is_none")]
     pub window: Option<WindowConfiguration>,
 
+    #[serde(rename = "urn:rdk:config:runtime", skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<RuntimeConfiguration>,
+
     #[serde(flatten)]
     pub vendor_config: HashMap<String, serde_json::Value>,
 }
@@ -331,6 +352,7 @@ impl Configuration {
             memory: None,
             storage: None,
             window: None,
+            runtime: None,
             vendor_config: HashMap::new(),
         }
     }
@@ -344,14 +366,24 @@ impl Configuration {
             && self.memory.is_none()
             && self.storage.is_none()
             && self.window.is_none()
+            && self.runtime.is_none()
             && self.vendor_config.is_empty()
     }
+}
+
+/// Default specVersion field value if not supplied, added for backwards compatibility
+/// with older package configs that don't have a specVersion field.
+fn default_spec_version() -> String {
+    "1.0.0".to_string()
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageConfig {
     pub id: String,
+
+    #[serde(default = "default_spec_version")]
+    pub spec_version: String,
 
     pub version: String,
 
@@ -366,7 +398,8 @@ pub struct PackageConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package_specifier: Option<String>,
 
-    pub entry_point: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_point: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entry_args: Option<Vec<String>>,
@@ -459,7 +492,7 @@ mod tests {
 
     #[test]
     fn test_basic_schema_validation() {
-        let config_json = include_str!("../testdata/package_config.json");
+        let config_json = include_str!("../testdata/package_config_v1.1.0.json");
 
         let result = PackageConfig::validate_str(config_json);
 
@@ -470,7 +503,7 @@ mod tests {
 
     #[test]
     fn test_deserialisation() {
-        let config_json = include_str!("../testdata/package_config.json");
+        let config_json = include_str!("../testdata/package_config_v1.0.0.json");
         let config: PackageConfig =
             serde_json::from_str(config_json).expect("Failed to read / parse package config file");
 
@@ -478,7 +511,7 @@ mod tests {
         assert_eq!(config.version, "1.2.3");
         assert_eq!(config.version_name.unwrap(), "1.2.3-beta");
 
-        assert_eq!(config.entry_point, "web/index.html".to_string());
+        assert_eq!(config.entry_point.unwrap(), "web/index.html".to_string());
         assert_eq!(
             config.entry_args,
             Some(vec!["--enable-feature-x".to_string(), "--set-mode=dark".to_string()])
@@ -489,12 +522,13 @@ mod tests {
     fn test_serialisation() {
         let config = PackageConfig {
             id: "com.sky.myapp".to_string(),
+            spec_version: "1.2.3".to_string(),
             version: "1.2.3".to_string(),
             version_name: Some("1.2.3-beta".to_string()),
             name: Some("My App".to_string()),
             package_type: "application".to_string(),
             package_specifier: Some("html".to_string()),
-            entry_point: "web/index.html".to_string(),
+            entry_point: Some("web/index.html".to_string()),
             entry_args: Some(vec!["--arg1".to_string(), "--arg2".to_string()]),
             dependencies: HashMap::new(),
             permissions: HashSet::new(),
@@ -508,6 +542,7 @@ mod tests {
                 memory: None,
                 storage: None,
                 window: None,
+                runtime: None,
                 vendor_config: HashMap::new(),
             },
         };
