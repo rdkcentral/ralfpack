@@ -181,13 +181,13 @@
               "pattern": "^\\d+[GMKBgmkb]?$"
             },
             "maxTimeToSuspendMemoryState": {
-              "type": "integer"
+              "type": "number"
             },
             "startupTimeout": {
-              "type": "integer"
+              "type": "number"
             },
             "watchdogInterval": {
-              "type": "integer"
+              "type": "number"
             }
           },
           "required": [
