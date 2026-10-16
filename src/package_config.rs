@@ -366,6 +366,7 @@ impl Configuration {
             && self.memory.is_none()
             && self.storage.is_none()
             && self.window.is_none()
+            && self.runtime.is_none()
             && self.vendor_config.is_empty()
     }
 }
