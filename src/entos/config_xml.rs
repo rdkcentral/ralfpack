@@ -93,20 +93,35 @@ fn empty_capabilities() -> Capabilities {
 /// how to convert existing config.xml capabilities into the new package config format.
 impl From<&ConfigXml> for PackageConfig {
     fn from(config_xml: &ConfigXml) -> Self {
-        let pkg_config = PackageConfig {
+        let pkg_type = config_xml.get_package_type();
+
+        let mut pkg_config = PackageConfig {
             id: config_xml.name.short.clone(),
-            spec_version: "1.1.0".to_string(),
+            spec_version: "1.0.0".to_string(),
             version: config_xml.get_package_version(),
             version_name: Some(config_xml.name.version.clone()),
             name: config_xml.name.long.clone(),
             entry_point: Some(config_xml.content.src.clone()),
             entry_args: None,
-            package_type: config_xml.get_package_type().to_string(),
+            package_type: pkg_type.to_string(),
             package_specifier: Some(config_xml.get_package_specifier().to_string()),
             dependencies: config_xml.get_package_dependencies(),
             permissions: config_xml.capabilities.to_permissions(),
             configuration: config_xml.get_configuration(),
         };
+
+        // According to the latest schema, for runtime types we're required to add the
+        // `urn:rdk:config:runtime` configuration to the package config.
+        // On EntOS platforms with is ignored, but for schema validation we need to add it.
+        if pkg_type == PackageType::Runtime {
+            let supported_application_type = SupportedApplicationType {
+                application_type: "application/".to_string() + &config_xml.get_package_specifier().to_string(),
+            };
+
+            pkg_config.configuration.runtime = Some(RuntimeConfiguration {
+                supported_application_types: vec![supported_application_type],
+            });
+        }
 
         pkg_config
     }
@@ -489,7 +504,7 @@ impl Capabilities {
         configuration.platform = Some(Platform {
             architecture: "arm".to_string(),
             variant: Some("v7".to_string()),
-            os: None,
+            os: Some("entos".to_string()),
         });
 
         configuration.log_levels = LogLevelsConfiguration::from_capabilities(self);
@@ -1178,7 +1193,7 @@ mod tests {
             Some(Platform {
                 architecture: "arm".to_string(),
                 variant: Some("v7".to_string()),
-                os: None,
+                os: Some("entos".to_string()),
             })
         );
     }
@@ -1209,6 +1224,13 @@ mod tests {
         assert_eq!(config_json.id, "com.sky.rdkbrowser");
         assert_eq!(config_json.version, "99.99.99");
         assert_eq!(config_json.version_name, Some("99.99.99".to_string()));
+        let runtime = config_json
+            .configuration
+            .runtime
+            .as_ref()
+            .expect("runtime package config should include a runtime configuration object");
+        assert_eq!(runtime.supported_application_types.len(), 1);
+        assert_eq!(runtime.supported_application_types[0].application_type, "application/html");
         // assert_eq!(
         //    config_json.dependencies,
         //    HashMap::from([(runtime_package_ids::BASE_LAYER.to_owned(), "*".to_owned())])

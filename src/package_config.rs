@@ -78,7 +78,7 @@ pub(crate) mod permissions {
     pub const COMPOSITOR_PERMISSION: &str = "urn:rdk:permission:compositor";
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum PackageType {
     Base,
@@ -263,7 +263,25 @@ pub struct WindowConfiguration {
     pub virtual_display_size: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportedApplicationType {
+    /// The application type that is supported by the runtime.
+    #[serde(rename = "type")]
+    pub application_type: String,
+
+    // There is also an "args" optional field in the schema, but it's not used on EntOS
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeConfiguration {
+    /// The list of supported application types for the runtime.  This can be used to
+    /// determine which runtimes can be used to run which applications.
+    pub supported_application_types: Vec<SupportedApplicationType>
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Platform {
     pub architecture: String,
@@ -315,6 +333,9 @@ pub struct Configuration {
     #[serde(rename = "urn:rdk:config:window", skip_serializing_if = "Option::is_none")]
     pub window: Option<WindowConfiguration>,
 
+    #[serde(rename = "urn:rdk:config:runtime", skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<RuntimeConfiguration>,
+
     #[serde(flatten)]
     pub vendor_config: HashMap<String, serde_json::Value>,
 }
@@ -331,6 +352,7 @@ impl Configuration {
             memory: None,
             storage: None,
             window: None,
+            runtime: None,
             vendor_config: HashMap::new(),
         }
     }
@@ -519,6 +541,7 @@ mod tests {
                 memory: None,
                 storage: None,
                 window: None,
+                runtime: None,
                 vendor_config: HashMap::new(),
             },
         };

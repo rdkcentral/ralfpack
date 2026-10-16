@@ -134,6 +134,7 @@
           "items": {
             "type": "string",
             "enum": [
+              "default",
               "fatal",
               "error",
               "warning",
@@ -177,7 +178,7 @@
             },
             "maxSuspendedSystemMemory": {
               "type": "string",
-              "pattern": "^\\d+[GMBgmb]?$"
+              "pattern": "^\\d+[GMKBgmkb]?$"
             },
             "maxTimeToSuspendMemoryState": {
               "type": "integer"
@@ -190,9 +191,7 @@
             }
           },
           "required": [
-            "supportedNonActiveStates",
-            "maxSuspendedSystemMemory",
-            "maxTimeToSuspendMemoryState"
+            "supportedNonActiveStates"
           ],
           "additionalProperties": false
         },
@@ -271,7 +270,6 @@
               }
             },
             "required": [
-              "name",
               "port",
               "protocol",
               "type"
@@ -279,38 +277,38 @@
           }
         },
         "urn:rdk:config:memory": {
-          "description": "Memory quota. Value can be specified with a G, M, or B suffix (case-insensitive). If no suffix is provided, the value is assumed to be in bytes.",
+          "description": "Memory quota. Value can be specified with a G, M, K or B suffix (case-insensitive). If no suffix is provided, the value is assumed to be in bytes.",
           "type": "object",
           "properties": {
             "system": {
               "type": "string",
-              "pattern": "^\\d+[GMBgmb]?$"
+              "pattern": "^\\d+[GMKBgmkb]?$"
             },
             "gpu": {
               "type": "string",
-              "pattern": "^\\d+[GMBgmb]?$"
+              "pattern": "^\\d+[GMKBgmkb]?$"
             }
           },
           "required": [
-            "system",
-            "gpu"
+            "system"
           ]
         },
         "urn:rdk:config:storage": {
-          "description": "Storage quota. Value can be specified with a G, M, or B suffix (case-insensitive). If no suffix is provided, the value is assumed to be in bytes.",
+          "description": "Storage quota. Value can be specified with a G, M, K or B suffix (case-insensitive). If no suffix is provided, the value is assumed to be in bytes.",
           "type": "object",
           "properties": {
             "maxLocalStorage": {
               "type": "string",
-              "pattern": "^\\d+[GMBgmb]?$"
+              "pattern": "^\\d+[GMKBgmkb]?$"
             },
             "sharedStorageAppId": {
               "type": "string",
               "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
             }
           },
-          "required": [
-            "maxLocalStorage"
+          "anyOf": [
+            { "required": ["maxLocalStorage"] },
+            { "required": ["sharedStorageAppId"] }
           ]
         }
       },
